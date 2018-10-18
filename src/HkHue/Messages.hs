@@ -34,10 +34,17 @@ newtype DaemonMsg = ProtocolError T.Text
 
 -- Accessory Types
 
-data RGBColor = RGBColor { cRed :: Int, cGreen :: Int, cBlue :: Int }
-              deriving (Data, Typeable, Generic, Show, Eq)
-data StateUpdate = StateUpdate {suColor :: Maybe RGBColor, suBrightness :: Maybe Int}
-                 deriving (Data, Typeable, Generic, Show, Eq)
+data RGBColor = RGBColor
+              { cRed :: Int
+              , cGreen :: Int
+              , cBlue :: Int
+              } deriving (Data, Typeable, Generic, Show, Eq)
+
+data StateUpdate = StateUpdate
+                 { suColor :: Maybe RGBColor
+                 , suBrightness :: Maybe Int
+                 , suColorTemperature :: Maybe Int
+                 } deriving (Data, Typeable, Generic, Show, Eq)
 
 -- Aeson Classes
 

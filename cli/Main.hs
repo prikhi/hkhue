@@ -62,18 +62,21 @@ data ClientMode = SetLight
                     { light :: Int
                     , color :: Maybe RGBColor
                     , brightness :: Maybe Int
+                    , colorTemperature :: Maybe Int
                     }
                 | SetAll
                     { color :: Maybe RGBColor
                     , brightness :: Maybe Int
+                    , colorTemperature :: Maybe Int
                     }
                 deriving (Data, Typeable, Show, Eq)
 
 
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
-    SetLight {..} -> setLightState light $ StateUpdate color brightness
-    SetAll {..}   -> setAllState $ StateUpdate color brightness
+    SetLight {..} ->
+        setLightState light $ StateUpdate color brightness colorTemperature
+    SetAll {..} -> setAllState $ StateUpdate color brightness colorTemperature
 
 
 -- Actions
@@ -98,7 +101,7 @@ arguments =
 setLight :: Annotate Ann
 setLight =
     record
-            (SetLight def def def)
+            (SetLight def def def def)
             [ light := def += argPos 0 += typ "LIGHT_ID"
             , color
             := def
@@ -114,6 +117,13 @@ setLight =
             += explicit
             += typ "INT"
             += help "Set the brightness using values from 1-254."
+            , colorTemperature
+            := def
+            += name "color-temperature"
+            += name "t"
+            += explicit
+            += typ "INT"
+            += help "Set the color temperature, in Kelvin, from 2000-6500."
             ]
         += name "set-light"
         += help "Set the state of a specific light."
@@ -121,7 +131,7 @@ setLight =
 setAll :: Annotate Ann
 setAll =
     record
-            (SetAll def def)
+            (SetAll def def def)
             [ color
             := def
             += name "color"
@@ -136,6 +146,13 @@ setAll =
             += explicit
             += typ "INT"
             += help "Set the brightness using values from 1-254."
+            , colorTemperature
+            := def
+            += name "color-temperature"
+            += name "t"
+            += explicit
+            += typ "INT"
+            += help "Set the color temperature, in Kelvin, from 2000-6500."
             ]
         += name "set-all"
         += help "Set the state of all lights."

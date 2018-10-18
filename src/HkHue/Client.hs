@@ -119,6 +119,10 @@ setAllState stateUpdate = do
 
 -- Color Utils
 
+-- | Scale a Color Temperature from Kelvin to Reciprocal Megakelvin.
+scaleColorTemp :: Int -> Int
+scaleColorTemp ct = floor $ 1000000 % ct
+
 -- | Scale a 1-100 Brightness value to 1-254
 scaleBrightness :: Int -> Int
 scaleBrightness b = floor (b % 100 * 254)
@@ -151,15 +155,14 @@ toXY r g b =
 -- | Convert a `StateUpdate` type into the JSON the Hue API expects.
 stateUpdateToHueJSON :: StateUpdate -> Value
 stateUpdateToHueJSON StateUpdate {..} =
-    let values =
-            maybeValue
-                    (\(RGBColor r g b) -> "xy" .= toXY (scaleChannel r)
-                                                       (scaleChannel g)
-                                                       (scaleChannel b)
-                    )
-                    suColor
-                ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
-    in  object values
+    object
+        $  maybeValue
+               (\(RGBColor r g b) -> "xy"
+                   .= toXY (scaleChannel r) (scaleChannel g) (scaleChannel b)
+               )
+               suColor
+        ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
+        ++ maybeValue (\ct -> "ct" .= scaleColorTemp ct) suColorTemperature
     where maybeValue f = maybe [] (\x -> [f x])
 
 
