@@ -4,9 +4,13 @@ module HkHue.Client
     , runClient
     , registerWithBridge
     , getLights
+    , setState
     , setColor
-    , setAllColor
+    , setAllState
     , resetColors
+    , scaleBrightness
+    , scaleChannel
+    , toXY
     )
 where
 
@@ -106,22 +110,26 @@ setState lightNumber stateJSON = do
 
 -- Groups
 
+-- | Set the LightState of all connected lights.
+-- TODO: Should be turn all lights on first?
 setAllState :: Value -> HueClient ()
 setAllState stateJSON = do
     response <- makeAuthRequest "groups/0/action" >>= liftIO . (`put` stateJSON)
     liftIO $ print response
     return ()
 
-setAllColor :: Int -> Int -> Int -> HueClient ()
-setAllColor r g b =
-    let (x, y) = toXY (toRational r / 255.0)
-                      (toRational g / 255.0)
-                      (toRational b / 255.0)
-    in  setAllState $ object ["xy" .= [x, y], "on" .= True]
-
 
 -- Color Utils
 
+-- | Scale a 1-100 Brightness value to 1-254
+scaleBrightness :: Int -> Int
+scaleBrightness b = floor (b % 100 * 254)
+
+-- | Scale a 0-255 RGB channel to a 0-1 value.
+scaleChannel :: Int -> Rational
+scaleChannel c = toRational c / 255
+
+-- | Convert RGB values from 0-1 into CIE XY values.
 toXY :: Rational -> Rational -> Rational -> (Double, Double)
 toXY r g b =
     let red   = gammaCorrect r

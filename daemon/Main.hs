@@ -1,7 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Main where
+module Main
+    ( main
+    )
+where
 
 import           Control.Concurrent             ( MVar
                                                 , newMVar
@@ -12,12 +15,10 @@ import           Control.Concurrent             ( MVar
 import           Control.Exception              ( finally )
 import           Control.Monad                  ( unless
                                                 , forever
-                                                , forM_
                                                 )
 import           Data.Aeson                     ( encode
                                                 , eitherDecode'
                                                 )
---import           Control.Monad.IO.Class         ( liftIO )
 import           Filesystem                     ( isFile
                                                 , createTree
                                                 )
@@ -87,16 +88,19 @@ disconnect state clientId = modifyMVar_ state $ \s -> return s
 
 handleClientMessages
     :: MVar DaemonState -> (ClientId, WS.Connection) -> ClientMsg -> IO ()
-handleClientMessages _ _ = \case
-    NoOp -> return ()
+handleClientMessages state _ = \case
+    SetColorAllLights red green blue -> run $ setAllColor red green blue
+    SetLightState lId lState         -> run $ setState lId lState
+    SetAllState lState               -> run $ setAllState lState
+    where run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> IO ()
 sendDaemonMsg conn = WS.sendTextData conn . encode
 
-broadcastDaemonMsg :: MVar DaemonState -> DaemonMsg -> IO ()
-broadcastDaemonMsg state msg = do
-    clients <- daemonClients <$> readMVar state
-    forM_ clients $ \(_, conn) -> sendDaemonMsg conn msg
+--broadcastDaemonMsg :: MVar DaemonState -> DaemonMsg -> IO ()
+--broadcastDaemonMsg state msg = do
+--    clients <- daemonClients <$> readMVar state
+--    forM_ clients $ \(_, conn) -> sendDaemonMsg conn msg
 
 
 -- Account Creation

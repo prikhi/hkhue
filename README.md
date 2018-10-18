@@ -3,6 +3,14 @@
 A Haskell library & application for controlling Philips Hue lights.
 
 
+## Status
+
+There is a shell of a daemon & CLI client, you can currently:
+
+* Set the brightness of a specific light
+* Set the brightness & color of all lights using an RGB value.
+
+
 ## Ideas
 
 Dunno exactly what I want but probably most of this:
@@ -12,7 +20,7 @@ Dunno exactly what I want but probably most of this:
   * Light renaming
   * Create/run preset scenes
   * Manually set each light (with either RGB & Color Temp)
-  * Set all lights
+  * Set all lights (brightness, RGB or Color Temp)
   * Global/Per-Light brightness adjustment
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
@@ -39,9 +47,25 @@ Dunno exactly what I want but probably most of this:
 
 ## Build / Run
 
+Build the applications & start the daemon:
+
 ```
 stack build
 stack exec hkhued -- <bridge-ip>
+```
+
+Then you can control the lights via cli:
+```
+stack exec hkhue -- set-all -b 40 -c 255,0,255
+```
+
+To see all available commands, run `stack exec hkhue -- --help`. Run `stack
+install` to install to `~/.local/bin/`:
+
+```
+stack install
+PATH="~/.local/bin:${PATH}"
+hkhue --help
 ```
 
 
