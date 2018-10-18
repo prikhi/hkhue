@@ -41,7 +41,7 @@ Dunno exactly what I want but probably most of this:
 
 ```
 stack build
-stack exec hkhue -- <bridge-ip>
+stack exec hkhued -- <bridge-ip>
 ```
 
 

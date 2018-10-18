@@ -22,29 +22,42 @@ description:         Please see the README on GitHub at <https://github.com/prik
 dependencies:
 - base >= 4.7 && < 5
 - text
+- aeson
 
 library:
   source-dirs: src
   dependencies:
-    - aeson
     - lens
     - lens-aeson
     - wreq
     - mtl
 
-executable:
-  main:                Main.hs
-  source-dirs:         app
-  ghc-options:
-  - -threaded
-  - -rtsopts
-  - -with-rtsopts=-N
-  dependencies:
-  - hkhue
-  - system-fileio
-  - system-filepath
-  - websockets
-  - xdg-basedir
+executables:
+  hkhue:
+    main:                Main.hs
+    source-dirs:         cli
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hkhue
+    - network
+    - websockets
+
+  hkhued:
+    main:                Main.hs
+    source-dirs:         daemon
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hkhue
+    - system-fileio
+    - system-filepath
+    - websockets
+    - xdg-basedir
 
 tests:
   hkhue-test:
