@@ -69,6 +69,7 @@ data ClientMode = SetLight
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
                     }
+                | Reset
                 deriving (Data, Typeable, Show, Eq)
 
 
@@ -77,6 +78,8 @@ dispatch = \case
     SetLight {..} ->
         setLightState light $ StateUpdate color brightness colorTemperature
     SetAll {..} -> setAllState $ StateUpdate color brightness colorTemperature
+    Reset       -> (`sendClientMsg` ResetAll)
+
 
 
 -- Actions
@@ -93,7 +96,7 @@ setLightState lId stateUpdate conn =
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setAll, setLight]
+    modes_ [setAll, setLight, reset]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += summary "hkhue v0.1.0, GPL-3.0"
@@ -156,3 +159,7 @@ setAll =
             ]
         += name "set-all"
         += help "Set the state of all lights."
+
+reset :: Annotate Ann
+reset = record Reset [] += name "reset" += help
+    "Reset all lights to the default color temperature of 2700K."

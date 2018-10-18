@@ -23,6 +23,7 @@ import qualified Data.Text                     as T
 -- of the clients
 data ClientMsg = SetLightState { lightId :: Int, lightState :: StateUpdate }
                | SetAllState { lightState :: StateUpdate }
+               | ResetAll
                deriving (Generic, Show)
 
 

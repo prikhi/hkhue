@@ -7,7 +7,7 @@ module HkHue.Client
     , getLights
     , setState
     , setAllState
-    --, resetColors
+    , resetColors
     , scaleBrightness
     , scaleChannel
     , toXY
@@ -81,17 +81,6 @@ getLights = do
     liftIO (print response)
     return $ response ^? responseBody . _JSON
 
--- | Switch all lights back to their factory default color
---resetColors :: HueClient ()
---resetColors = do
---    lightCount <- length . (^@.. members) . fromMaybe emptyArray <$> getLights
---    let defaultColor = object
---            [ "colormode" .= ("ct" :: T.Text)
---            , "ct" .= (366 :: Integer)
---            , "bri" .= (254 :: Integer)
---            ]
---    mapM_ (`setState` defaultColor) [1 .. lightCount]
-
 -- | Set the state of a light
 setState :: Int -> StateUpdate -> HueClient ()
 setState lightNumber stateUpdate = do
@@ -115,6 +104,14 @@ setAllState stateUpdate = do
         .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO $ print response
     return ()
+
+-- | Switch all lights back to their factory default color
+resetColors :: HueClient ()
+resetColors = setAllState StateUpdate
+    { suColor            = Nothing
+    , suBrightness       = Just 100
+    , suColorTemperature = Just 2732
+    }
 
 
 -- Color Utils
