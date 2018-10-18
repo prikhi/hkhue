@@ -1,18 +1,14 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 module Main
     ( main
     )
 where
 
-import           Data.Aeson                     ( encode
-                                                , object
-                                                , (.=)
-                                                )
+import           Data.Aeson                     ( encode )
 import           Data.Data                      ( Data )
-import           Data.Ratio                     ( (%) )
 import           Data.Typeable                  ( Typeable )
 import           Network.Socket                 ( withSocketsDo )
 import           System.Console.CmdArgs         ( Annotate(..)
@@ -31,14 +27,14 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , summary
                                                 )
 
-import           HkHue.Client                   ( scaleChannel
-                                                , scaleBrightness
-                                                , toXY
+import           HkHue.Messages                 ( ClientMsg(..)
+                                                , StateUpdate(..)
+                                                , RGBColor(..)
                                                 )
-import           HkHue.Messages                 ( ClientMsg(..) )
 
 import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
+
 
 main :: IO ()
 main = do
@@ -59,78 +55,87 @@ app socketConversation conn = do
 sendClientMsg :: WS.Connection -> ClientMsg -> IO ()
 sendClientMsg conn = WS.sendTextData conn . encode
 
--- Modes -> WebSockets
 
-data ClientMode = SetBrightness { light :: Int, bright :: Int }
-                | SetAll { saColor :: Maybe SAColor, saBrightness :: Maybe Int }
+-- Command Modes
+
+data ClientMode = SetLight
+                    { light :: Int
+                    , color :: Maybe RGBColor
+                    , brightness :: Maybe Int
+                    }
+                | SetAll
+                    { color :: Maybe RGBColor
+                    , brightness :: Maybe Int
+                    }
                 deriving (Data, Typeable, Show, Eq)
 
-data SAColor = SAColor { sacRed :: Int, sacGreen :: Int, sacBlue :: Int }
-                deriving (Data, Typeable, Show, Eq)
 
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
-    SetBrightness l b -> setLightBrightness l (floor $ b % 100 * 255)
-    SetAll {..}       -> setAllState saColor saBrightness
+    SetLight {..} -> setLightState light $ StateUpdate color brightness
+    SetAll {..}   -> setAllState $ StateUpdate color brightness
 
-setAllState :: Maybe SAColor -> Maybe Int -> WSDispatch
-setAllState mColor mBrightness conn
-    = let values =
-              maybeValue
-                      (\(SAColor r g b) -> "xy" .= toXY (scaleChannel r)
-                                                        (scaleChannel g)
-                                                        (scaleChannel b)
-                      )
-                      mColor
-                  ++ maybeValue (\b -> "bri" .= scaleBrightness b) mBrightness
-      in  if null values
-              then putStrLn
-                  "Specify at least one flag to update the light states."
-              else sendClientMsg conn $ SetAllState $ object values
-    where maybeValue f = maybe [] (\x -> [f x])
 
-setLightBrightness :: Int -> Int -> WSDispatch
-setLightBrightness lId brightness conn = sendClientMsg conn
-    $ SetLightState lId lightData
-    where lightData = object ["bri" .= brightness]
+-- Actions
+
+setAllState :: StateUpdate -> WSDispatch
+setAllState stateUpdate conn = sendClientMsg conn $ SetAllState stateUpdate
+
+setLightState :: Int -> StateUpdate -> WSDispatch
+setLightState lId stateUpdate conn =
+    sendClientMsg conn $ SetLightState lId stateUpdate
 
 
 -- Argument Parsing
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setBrightness, setAll]
+    modes_ [setAll, setLight]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += summary "hkhue v0.1.0, GPL-3.0"
 
-setAll :: Annotate Ann
-setAll =
+setLight :: Annotate Ann
+setLight =
     record
-            (SetAll def def)
-            [ saColor
+            (SetLight def def def)
+            [ light := def += argPos 0 += typ "LIGHT_ID"
+            , color
             := def
             += name "color"
             += name "c"
             += explicit
             += typ "RED,GREEN,BLUE"
             += help "Set the color using values from 0-255."
-            , saBrightness
+            , brightness
             := def
             += name "brightness"
             += name "b"
+            += explicit
+            += typ "INT"
+            += help "Set the brightness using values from 1-254."
+            ]
+        += name "set-light"
+        += help "Set the state of a specific light."
+
+setAll :: Annotate Ann
+setAll =
+    record
+            (SetAll def def)
+            [ color
+            := def
+            += name "color"
+            += name "c"
+            += explicit
+            += typ "RED,GREEN,BLUE"
+            += help "Set the color using values from 0-255."
+            , brightness
+            := def
+            += name "brightness"
+            += name "b"
+            += explicit
             += typ "INT"
             += help "Set the brightness using values from 1-254."
             ]
         += name "set-all"
         += help "Set the state of all lights."
-
-setBrightness :: Annotate Ann
-setBrightness =
-    record
-            SetBrightness {light = def, bright = def}
-            [ light := def += argPos 0 += typ "LIGHT_ID"
-            , bright := def += argPos 1 += typ "BRIGHTNESS"
-            ]
-        += name "set-brightness"
-        += help "Set the Brightness(0-254) of a light."

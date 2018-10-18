@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module HkHue.Client
     ( HueConfig(..)
     , runClient
     , registerWithBridge
     , getLights
     , setState
-    , setColor
     , setAllState
-    , resetColors
+    --, resetColors
     , scaleBrightness
     , scaleChannel
     , toXY
@@ -15,7 +15,7 @@ module HkHue.Client
 where
 
 import           Control.Lens                   ( (^?)
-                                                , (^@..)
+                                                --, (^@..)
                                                 )
 import           Control.Monad.Reader           ( ReaderT
                                                 , runReaderT
@@ -26,17 +26,21 @@ import           Data.Aeson                     ( (.=)
                                                 , Value
                                                 , object
                                                 )
-import           Data.Aeson.Types               ( emptyArray )
+--import           Data.Aeson.Types               ( emptyArray )
 
 import           Data.Aeson.Lens                ( key
                                                 , nth
-                                                , members
+                                                --, members
                                                 , _String
                                                 , _JSON
                                                 )
-import           Data.Maybe                     ( fromMaybe )
+--import           Data.Maybe                     ( fromMaybe )
 import           Data.Ratio                     ( (%) )
 import           Network.Wreq
+
+import           HkHue.Messages                 ( StateUpdate(..)
+                                                , RGBColor(..)
+                                                )
 
 import qualified Data.Text                     as T
 
@@ -78,32 +82,23 @@ getLights = do
     return $ response ^? responseBody . _JSON
 
 -- | Switch all lights back to their factory default color
-resetColors :: HueClient ()
-resetColors = do
-    lightCount <- length . (^@.. members) . fromMaybe emptyArray <$> getLights
-    let defaultColor = object
-            [ "colormode" .= ("ct" :: T.Text)
-            , "ct" .= (366 :: Integer)
-            , "bri" .= (254 :: Integer)
-            ]
-    mapM_ (`setState` defaultColor) [1 .. lightCount]
-
--- | TODO: Ensure light is on - for performance reasons we don't always
--- send "turn on" command
-setColor :: Int -> Int -> Int -> Int -> HueClient ()
-setColor lightNumber r g b =
-    let (x, y) = toXY (toRational r / 255.0)
-                      (toRational g / 255.0)
-                      (toRational b / 255.0)
-    in  setState lightNumber $ object ["xy" .= [x, y]]
+--resetColors :: HueClient ()
+--resetColors = do
+--    lightCount <- length . (^@.. members) . fromMaybe emptyArray <$> getLights
+--    let defaultColor = object
+--            [ "colormode" .= ("ct" :: T.Text)
+--            , "ct" .= (366 :: Integer)
+--            , "bri" .= (254 :: Integer)
+--            ]
+--    mapM_ (`setState` defaultColor) [1 .. lightCount]
 
 -- | Set the state of a light
-setState :: Int -> Value -> HueClient ()
-setState lightNumber stateJSON = do
+setState :: Int -> StateUpdate -> HueClient ()
+setState lightNumber stateUpdate = do
     response <-
         makeAuthRequest ("lights/" <> T.pack (show lightNumber) <> "/state")
         >>= liftIO
-        .   (`put` stateJSON)
+        .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO (print response)
     return ()
 
@@ -112,9 +107,12 @@ setState lightNumber stateJSON = do
 
 -- | Set the LightState of all connected lights.
 -- TODO: Should be turn all lights on first?
-setAllState :: Value -> HueClient ()
-setAllState stateJSON = do
-    response <- makeAuthRequest "groups/0/action" >>= liftIO . (`put` stateJSON)
+setAllState :: StateUpdate -> HueClient ()
+setAllState stateUpdate = do
+    response <-
+        makeAuthRequest "groups/0/action"
+        >>= liftIO
+        .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO $ print response
     return ()
 
@@ -148,6 +146,22 @@ toXY r g b =
 
 
 -- Request Utils
+
+
+-- | Convert a `StateUpdate` type into the JSON the Hue API expects.
+stateUpdateToHueJSON :: StateUpdate -> Value
+stateUpdateToHueJSON StateUpdate {..} =
+    let values =
+            maybeValue
+                    (\(RGBColor r g b) -> "xy" .= toXY (scaleChannel r)
+                                                       (scaleChannel g)
+                                                       (scaleChannel b)
+                    )
+                    suColor
+                ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
+    in  object values
+    where maybeValue f = maybe [] (\x -> [f x])
+
 
 makeRequest :: T.Text -> T.Text -> String
 makeRequest bridgeHost route =
