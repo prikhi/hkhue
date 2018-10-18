@@ -17,8 +17,7 @@ import qualified Data.Text                     as T
 
 -- TODO: Expand the "Value" out so the daemon does Hue conversions instead
 -- of the clients
-data ClientMsg = SetColorAllLights { cRed :: Int, cGreen :: Int, cBlue :: Int }
-               | SetLightState { lightId :: Int, lightState :: Value }
+data ClientMsg = SetLightState { lightId :: Int, lightState :: Value }
                | SetAllState { lightState :: Value }
                deriving (Generic, Show)
 

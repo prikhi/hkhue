@@ -89,9 +89,8 @@ disconnect state clientId = modifyMVar_ state $ \s -> return s
 handleClientMessages
     :: MVar DaemonState -> (ClientId, WS.Connection) -> ClientMsg -> IO ()
 handleClientMessages state _ = \case
-    SetColorAllLights red green blue -> run $ setAllColor red green blue
-    SetLightState lId lState         -> run $ setState lId lState
-    SetAllState lState               -> run $ setAllState lState
+    SetLightState lId lState -> run $ setState lId lState
+    SetAllState lState       -> run $ setAllState lState
     where run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> IO ()
