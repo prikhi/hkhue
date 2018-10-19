@@ -10,7 +10,7 @@ There is a daemon & CLI client, which currently supports:
 * Identifying lights by blinking them on & off.
 * Reseting all the lights to their default color temperature & brightness.
 * Setting the Brightness & Color-Temperature/RGB of a specific light or all
-  lights.
+  lights - with custom light-state transition times.
 
 
 ## Ideas
@@ -21,7 +21,6 @@ Dunno exactly what I want but probably most of this:
   * Light renaming
   * Create/run preset scenes
   * Toggle light(s) on/off.
-  * Set light color(s) (brightness, RGB or Color Temp) w/ transition time
     * Properly handle on/off w/ transition times:
        https://developers.meethue.com/content/brightness-turns-down-1-automatically-shortly-after-sending-signal-hue-bug
   * Global/Per-Light increments (brightness & color temp)

@@ -44,6 +44,7 @@ data StateUpdate = StateUpdate
                  { suColor :: Maybe RGBColor
                  , suBrightness :: Maybe Int
                  , suColorTemperature :: Maybe Int
+                 , suTransitionTime :: Maybe Int
                  } deriving (Data, Typeable, Generic, Show, Eq)
 
 -- Aeson Classes

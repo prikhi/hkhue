@@ -121,6 +121,7 @@ resetColors = setAllState StateUpdate
     { suColor            = Nothing
     , suBrightness       = Just 100
     , suColorTemperature = Just 2732
+    , suTransitionTime   = Nothing
     }
 
 
@@ -170,6 +171,7 @@ stateUpdateToHueJSON StateUpdate {..} =
                suColor
         ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
         ++ maybeValue (\ct -> "ct" .= scaleColorTemp ct) suColorTemperature
+        ++ maybeValue (\tt -> "transitiontime" .= tt)    suTransitionTime
     where maybeValue f = maybe [] (\x -> [f x])
 
 

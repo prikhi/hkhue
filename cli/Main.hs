@@ -64,6 +64,7 @@ data ClientMode = SetLight
                     , color :: Maybe RGBColor
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
+                    , transitionTime :: Maybe Int
                     }
                 | AlertLight
                     { light :: Int
@@ -72,6 +73,7 @@ data ClientMode = SetLight
                     { color :: Maybe RGBColor
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
+                    , transitionTime :: Maybe Int
                     }
                 | Reset
                 deriving (Data, Typeable, Show, Eq)
@@ -79,10 +81,21 @@ data ClientMode = SetLight
 
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
-    SetLight {..} ->
-        setLightState light $ StateUpdate color brightness colorTemperature
+    SetLight {..} -> setLightState
+        light
+        StateUpdate
+            { suColor            = color
+            , suBrightness       = brightness
+            , suColorTemperature = colorTemperature
+            , suTransitionTime   = transitionTime
+            }
     AlertLight {..} -> (`sendClientMsg` Alert light)
-    SetAll {..} -> setAllState $ StateUpdate color brightness colorTemperature
+    SetAll {..}     -> setAllState StateUpdate
+        { suColor            = color
+        , suBrightness       = brightness
+        , suColorTemperature = colorTemperature
+        , suTransitionTime   = transitionTime
+        }
     Reset -> (`sendClientMsg` ResetAll)
 
 
@@ -110,7 +123,7 @@ arguments =
 setLight :: Annotate Ann
 setLight =
     record
-            (SetLight def def def def)
+            (SetLight def def def def def)
             [ light := def += argPos 0 += typ "LIGHT_ID"
             , color
             := def
@@ -129,10 +142,22 @@ setLight =
             , colorTemperature
             := def
             += name "color-temperature"
-            += name "t"
+            += name "ct"
+            += name "k"
             += explicit
             += typ "INT"
             += help "Set the color temperature, in Kelvin, from 2000-6500."
+            , transitionTime
+            := def
+            += name "transition-time"
+            += name "t"
+            += explicit
+            += typ "INT"
+            += help
+                   ("Set the transition duration to the new state, in "
+                   <> "100ms, from 0-65535. E.g., `-t 10` will set a transition "
+                   <> "time of 1 second."
+                   )
             ]
         += name "set-light"
         += help "Set the state of a specific light."
@@ -146,7 +171,7 @@ alert =
 setAll :: Annotate Ann
 setAll =
     record
-            (SetAll def def def)
+            (SetAll def def def def)
             [ color
             := def
             += name "color"
@@ -164,10 +189,22 @@ setAll =
             , colorTemperature
             := def
             += name "color-temperature"
-            += name "t"
+            += name "ct"
+            += name "k"
             += explicit
             += typ "INT"
             += help "Set the color temperature, in Kelvin, from 2000-6500."
+            , transitionTime
+            := def
+            += name "transition-time"
+            += name "t"
+            += explicit
+            += typ "INT"
+            += help
+                   ("Set the transition duration to the new state, in "
+                   <> "100ms, from 0-65535. E.g., `-t 10` will set a transition "
+                   <> "time of 1 second."
+                   )
             ]
         += name "set-all"
         += help "Set the state of all lights."
