@@ -19,11 +19,10 @@ import           GHC.Generics
 
 import qualified Data.Text                     as T
 
--- TODO: Expand the "Value" out so the daemon does Hue conversions instead
--- of the clients
 data ClientMsg = SetLightState { lightId :: Int, lightState :: StateUpdate }
                | SetAllState { lightState :: StateUpdate }
                | ResetAll
+               | Alert { lightId :: Int }
                deriving (Generic, Show)
 
 

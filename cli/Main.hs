@@ -18,6 +18,7 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , modes_
                                                 , program
                                                 , help
+                                                , helpArg
                                                 , record
                                                 , def
                                                 , argPos
@@ -64,6 +65,9 @@ data ClientMode = SetLight
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
                     }
+                | AlertLight
+                    { light :: Int
+                    }
                 | SetAll
                     { color :: Maybe RGBColor
                     , brightness :: Maybe Int
@@ -77,8 +81,9 @@ dispatch :: ClientMode -> WSDispatch
 dispatch = \case
     SetLight {..} ->
         setLightState light $ StateUpdate color brightness colorTemperature
+    AlertLight {..} -> (`sendClientMsg` Alert light)
     SetAll {..} -> setAllState $ StateUpdate color brightness colorTemperature
-    Reset       -> (`sendClientMsg` ResetAll)
+    Reset -> (`sendClientMsg` ResetAll)
 
 
 
@@ -96,9 +101,10 @@ setLightState lId stateUpdate conn =
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setAll, setLight, reset]
+    modes_ [setLight, alert, setAll, reset]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
+        += helpArg [name "h"]
         += summary "hkhue v0.1.0, GPL-3.0"
 
 setLight :: Annotate Ann
@@ -130,6 +136,12 @@ setLight =
             ]
         += name "set-light"
         += help "Set the state of a specific light."
+
+alert :: Annotate Ann
+alert =
+    record (AlertLight def) [light := def += argPos 0 += typ "LIGHT_ID"]
+        += name "alert-light"
+        += help "Toggle a specific light, then return to the current state."
 
 setAll :: Annotate Ann
 setAll =

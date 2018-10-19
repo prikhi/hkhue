@@ -92,6 +92,7 @@ handleClientMessages state _ = \case
     SetLightState lId lState -> run $ setState lId lState
     SetAllState lState       -> run $ setAllState lState
     ResetAll                 -> run resetColors
+    Alert lId                -> run $ alertLight lId
     where run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> IO ()

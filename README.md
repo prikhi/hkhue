@@ -5,10 +5,12 @@ A Haskell library & application for controlling Philips Hue lights.
 
 ## Status
 
-There is a shell of a daemon & CLI client, you can currently:
+There is a daemon & CLI client, which currently supports:
 
-* Set the brightness of a specific light
-* Set the brightness & color of all lights using an RGB value.
+* Identifying lights by blinking them on & off.
+* Reseting all the lights to their default color temperature & brightness.
+* Setting the Brightness & Color-Temperature/RGB of a specific light or all
+  lights.
 
 
 ## Ideas
@@ -16,25 +18,33 @@ There is a shell of a daemon & CLI client, you can currently:
 Dunno exactly what I want but probably most of this:
 
 * Basic usage
-  * Light identifier(blink the specified light on/off for 2-3 seconds)
   * Light renaming
   * Create/run preset scenes
-  * Manually set each light (with either RGB & Color Temp)
-  * Set all lights (brightness, RGB or Color Temp)
-  * Global/Per-Light brightness adjustment
+  * Toggle light(s) on/off.
+  * Set light color(s) (brightness, RGB or Color Temp) w/ transition time
+    * Properly handle on/off w/ transition times:
+       https://developers.meethue.com/content/brightness-turns-down-1-automatically-shortly-after-sending-signal-hue-bug
+  * Global/Per-Light increments (brightness & color temp)
+  * Dameon & CLI Client Config files - daemon needs bridge host, bind address,
+    & port; client needs daemon address and port
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
   * Constant slow fades between colors
-  * Breathing
-  * Flickering/Candlelight
+  * Breathing(brightness sine-wave)
+  * Flickering/Candlelight(brightness randomization?)
   * Party mode
   * Sound reactive
   * Color based on computer monitor
+  * Match Redshift(see `redshift -p | grep Temp`)
+    * Make CLI command that syncs redshift w/ current color temp? CLI command
+      instead of daemon command would let us keep remote redshift instances in
+      sync.
+* Not so urgent
+  * Similar commands for controlling groups
 * Management Daemon
   * Listens for client commands and send appropriate message to Hue hub
   * Database for storing color bank, custom effects, scene
   * Manages & cancels long-running effects
-  * Config file - just need bridge host/ip for now
 * A GUI for manual control & CLI for scripting
   * Elm for Web GUI?
   * Websockets for Elm, Sockets for CLI? Or websockets for both?

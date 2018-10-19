@@ -5,6 +5,7 @@ module HkHue.Client
     , runClient
     , registerWithBridge
     , getLights
+    , alertLight
     , setState
     , setAllState
     , resetColors
@@ -81,6 +82,16 @@ getLights = do
     liftIO (print response)
     return $ response ^? responseBody . _JSON
 
+
+-- | Use the alert effect to cycle one light on/off.
+alertLight :: Int -> HueClient ()
+alertLight lightNumber = do
+    response <-
+        makeAuthRequest ("lights/" <> T.pack (show lightNumber) <> "/state")
+        >>= liftIO
+        .   (`put` object ["alert" .= ("select" :: T.Text)])
+    liftIO (print response)
+
 -- | Set the state of a light
 setState :: Int -> StateUpdate -> HueClient ()
 setState lightNumber stateUpdate = do
@@ -89,7 +100,6 @@ setState lightNumber stateUpdate = do
         >>= liftIO
         .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO (print response)
-    return ()
 
 
 -- Groups
@@ -149,7 +159,7 @@ toXY r g b =
 -- Request Utils
 
 
--- | Convert a `StateUpdate` type into the JSON the Hue API expects.
+-- | Convert a `StateUpdate` type into the state JSON the Hue API expects.
 stateUpdateToHueJSON :: StateUpdate -> Value
 stateUpdateToHueJSON StateUpdate {..} =
     object
