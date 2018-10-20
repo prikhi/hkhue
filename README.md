@@ -20,6 +20,7 @@ Dunno exactly what I want but probably most of this:
 * Basic usage
   * Query light status - id, name, on/off, color, brightness
   * Light renaming
+    * Support using light names instead of ID numbers for all arguments
   * Create/run preset scenes
     * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
