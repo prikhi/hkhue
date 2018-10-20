@@ -89,7 +89,7 @@ Run `stack install` to install to `~/.local/bin/`:
 stack install
 PATH="~/.local/bin:${PATH}"
 hkhue set-all --on --color-temperature 2500 --brightness 75 --transition-time 300
-hkhue alert-light 1
+hkhue alert 1
 hkhue set-light 1 --color 255,0,255 -b 100 -t 100
 ```
 

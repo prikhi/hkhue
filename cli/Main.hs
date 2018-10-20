@@ -177,7 +177,7 @@ setLight =
 alert :: Annotate Ann
 alert =
     record (AlertLight def) [light := def += argPos 0 += typ "LIGHT_ID"]
-        += name "alert-light"
+        += name "alert"
         += help "Toggle a specific light, then return to the current state."
 
 setAll :: Annotate Ann
