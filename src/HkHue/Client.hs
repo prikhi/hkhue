@@ -184,11 +184,13 @@ stateUpdateToHueJSON StateUpdate {..} =
                    .= toXY (scaleChannel r) (scaleChannel g) (scaleChannel b)
                )
                suColor
-        ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
-        ++ maybeValue (\ct -> "ct" .= scaleColorTemp ct) suColorTemperature
-        ++ maybeValue (\tt -> "transitiontime" .= tt)    suTransitionTime
-        ++ maybeValue (\power -> "on" .= (power == On))  suPower
-    where maybeValue f = maybe [] (\x -> [f x])
+        ++ maybeField "bri"            scaleBrightness suBrightness
+        ++ maybeField "ct"             scaleColorTemp  suColorTemperature
+        ++ maybeField "transitiontime" id              suTransitionTime
+        ++ maybeField "on"             (On ==)         suPower
+  where
+    maybeValue f = maybe [] (\x -> [f x])
+    maybeField k f = maybe [] (\x -> [k .= f x])
 
 
 makeRequest :: T.Text -> T.Text -> String
