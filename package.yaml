@@ -55,6 +55,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - hkhue
+    - containers
+    - lens
+    - lens-aeson
     - system-fileio
     - system-filepath
     - websockets

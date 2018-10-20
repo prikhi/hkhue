@@ -14,8 +14,10 @@ import           Network.Socket                 ( withSocketsDo )
 import           System.Console.CmdArgs         ( Annotate(..)
                                                 , Ann
                                                 , (+=)
+                                                , atom
                                                 , cmdArgs_
                                                 , modes_
+                                                , enum_
                                                 , program
                                                 , help
                                                 , helpArg
@@ -31,6 +33,7 @@ import           System.Console.CmdArgs         ( Annotate(..)
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , StateUpdate(..)
                                                 , RGBColor(..)
+                                                , LightPower(..)
                                                 )
 
 import qualified Data.Text                     as T
@@ -65,6 +68,7 @@ data ClientMode = SetLight
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
                     , transitionTime :: Maybe Int
+                    , lightPower :: Maybe LightPower
                     }
                 | AlertLight
                     { light :: Int
@@ -74,6 +78,7 @@ data ClientMode = SetLight
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
                     , transitionTime :: Maybe Int
+                    , lightPower :: Maybe LightPower
                     }
                 | Reset
                 deriving (Data, Typeable, Show, Eq)
@@ -88,6 +93,7 @@ dispatch = \case
             , suBrightness       = brightness
             , suColorTemperature = colorTemperature
             , suTransitionTime   = transitionTime
+            , suPower            = lightPower
             }
     AlertLight {..} -> (`sendClientMsg` Alert light)
     SetAll {..}     -> setAllState StateUpdate
@@ -95,6 +101,7 @@ dispatch = \case
         , suBrightness       = brightness
         , suColorTemperature = colorTemperature
         , suTransitionTime   = transitionTime
+        , suPower            = lightPower
         }
     Reset -> (`sendClientMsg` ResetAll)
 
@@ -123,7 +130,7 @@ arguments =
 setLight :: Annotate Ann
 setLight =
     record
-            (SetLight def def def def def)
+            (SetLight def def def def def def)
             [ light := def += argPos 0 += typ "LIGHT_ID"
             , color
             := def
@@ -158,6 +165,11 @@ setLight =
                    <> "100ms, from 0-65535. E.g., `-t 10` will set a transition "
                    <> "time of 1 second."
                    )
+            , enum_
+                lightPower
+                [ atom (Just On) += name "on" += help "Turn light on."
+                , atom (Just Off) += name "off" += help "Turn light off."
+                ]
             ]
         += name "set-light"
         += help "Set the state of a specific light."
@@ -171,7 +183,7 @@ alert =
 setAll :: Annotate Ann
 setAll =
     record
-            (SetAll def def def def)
+            (SetAll def def def def def)
             [ color
             := def
             += name "color"
@@ -205,6 +217,11 @@ setAll =
                    <> "100ms, from 0-65535. E.g., `-t 10` will set a transition "
                    <> "time of 1 second."
                    )
+            , enum_
+                lightPower
+                [ atom (Just On) += name "on" += help "Turn light on."
+                , atom (Just Off) += name "off" += help "Turn light off."
+                ]
             ]
         += name "set-all"
         += help "Set the state of all lights."

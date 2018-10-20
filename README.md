@@ -21,9 +21,7 @@ Dunno exactly what I want but probably most of this:
   * Query light status - id, name, on/off, color, brightness
   * Light renaming
   * Create/run preset scenes
-  * Toggle light(s) on/off.
-    * Properly handle on/off w/ transition times:
-       https://developers.meethue.com/content/brightness-turns-down-1-automatically-shortly-after-sending-signal-hue-bug
+    * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
   * Dameon & CLI Client Config files - daemon needs bridge host, bind address,
     & port; client needs daemon address and port
@@ -79,7 +77,8 @@ stack build
 stack exec hkhued -- <bridge-ip>
 ```
 
-Then you can control the lights via cli:
+Then you can control the lights with the CLI client:
+
 ```
 stack exec hkhue -- set-all -b 40 -c 255,0,255
 ```

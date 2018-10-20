@@ -5,11 +5,13 @@ module HkHue.Client
     , runClient
     , registerWithBridge
     , getLights
+    , getLightBrightness
     , alertLight
     , setState
     , setAllState
     , resetColors
     , scaleBrightness
+    , unscaleBrightness
     , scaleChannel
     , toXY
     )
@@ -33,6 +35,7 @@ import           Data.Aeson.Lens                ( key
                                                 , nth
                                                 --, members
                                                 , _String
+                                                , _Integer
                                                 , _JSON
                                                 )
 --import           Data.Maybe                     ( fromMaybe )
@@ -41,6 +44,7 @@ import           Network.Wreq
 
 import           HkHue.Messages                 ( StateUpdate(..)
                                                 , RGBColor(..)
+                                                , LightPower(..)
                                                 )
 
 import qualified Data.Text                     as T
@@ -82,6 +86,14 @@ getLights = do
     liftIO (print response)
     return $ response ^? responseBody . _JSON
 
+-- | Return the Brightness of a light, from 1-254.
+getLightBrightness :: Int -> HueClient (Maybe Integer)
+getLightBrightness lId = do
+    response <-
+        makeAuthRequest ("lights/" <> T.pack (show lId)) >>= liftIO . get
+    liftIO $ print response
+    return $ response ^? responseBody . key "state" . key "bri" . _Integer
+
 
 -- | Use the alert effect to cycle one light on/off.
 alertLight :: Int -> HueClient ()
@@ -105,7 +117,6 @@ setState lightNumber stateUpdate = do
 -- Groups
 
 -- | Set the LightState of all connected lights.
--- TODO: Should be turn all lights on first?
 setAllState :: StateUpdate -> HueClient ()
 setAllState stateUpdate = do
     response <-
@@ -113,7 +124,6 @@ setAllState stateUpdate = do
         >>= liftIO
         .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO $ print response
-    return ()
 
 -- | Switch all lights back to their factory default color
 resetColors :: HueClient ()
@@ -122,6 +132,7 @@ resetColors = setAllState StateUpdate
     , suBrightness       = Just 100
     , suColorTemperature = Just 2732
     , suTransitionTime   = Nothing
+    , suPower            = Just On
     }
 
 
@@ -134,6 +145,10 @@ scaleColorTemp ct = floor $ 1000000 % ct
 -- | Scale a 1-100 Brightness value to 1-254
 scaleBrightness :: Int -> Int
 scaleBrightness b = floor (b % 100 * 254)
+
+-- | Scale a 1-254 Brightness value to 1-100
+unscaleBrightness :: Int -> Int
+unscaleBrightness b = ceiling (b * 100 % 254)
 
 -- | Scale a 0-255 RGB channel to a 0-1 value.
 scaleChannel :: Int -> Rational
@@ -172,6 +187,7 @@ stateUpdateToHueJSON StateUpdate {..} =
         ++ maybeValue (\b -> "bri" .= scaleBrightness b) suBrightness
         ++ maybeValue (\ct -> "ct" .= scaleColorTemp ct) suColorTemperature
         ++ maybeValue (\tt -> "transitiontime" .= tt)    suTransitionTime
+        ++ maybeValue (\power -> "on" .= (power == On))  suPower
     where maybeValue f = maybe [] (\x -> [f x])
 
 

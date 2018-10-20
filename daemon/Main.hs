@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 module Main
     ( main
     )
@@ -13,12 +14,16 @@ import           Control.Concurrent             ( MVar
                                                 , modifyMVar_
                                                 )
 import           Control.Exception              ( finally )
+import           Control.Lens                   ( (^@..) )
 import           Control.Monad                  ( unless
                                                 , forever
+                                                , forM_
                                                 )
 import           Data.Aeson                     ( encode
                                                 , eitherDecode'
                                                 )
+import           Data.Aeson.Lens                ( members )
+import           Data.Maybe                     ( mapMaybe )
 import           Filesystem                     ( isFile
                                                 , createTree
                                                 )
@@ -28,12 +33,16 @@ import           System.Environment.XDG.BaseDir ( getUserDataFile
                                                 , getUserDataDir
                                                 )
 import           System.Exit                    ( exitFailure )
+import           Text.Read                      ( readMaybe )
 
 import           HkHue.Client
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
+                                                , StateUpdate(..)
+                                                , LightPower(..)
                                                 )
 
+import qualified Data.Map.Strict               as Map
 import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
 
@@ -47,13 +56,15 @@ main = do
         b : _ -> return $ T.pack b
     account <- getHueAccount bridgeHost
     let config = HueConfig {hueBridgeHost = bridgeHost, hueAccount = account}
-    state <- newMVar $ DaemonState config [] (ClientId 1)
+    state <- newMVar $ DaemonState config [] (ClientId 1) Map.empty
     WS.runServer "0.0.0.0" 9160 $ application state
 
 data DaemonState =
         DaemonState { daemonConfig :: HueConfig
                     , daemonClients :: [(ClientId, WS.Connection)]
-                    , daemonNextClientId :: ClientId}
+                    , daemonNextClientId :: ClientId
+                    , daemonStoredBrightness :: Map.Map Int Int
+                    }
 
 newtype ClientId = ClientId Integer deriving (Eq)
 nextClientId :: MVar DaemonState -> IO ClientId
@@ -89,11 +100,28 @@ disconnect state clientId = modifyMVar_ state $ \s -> return s
 handleClientMessages
     :: MVar DaemonState -> (ClientId, WS.Connection) -> ClientMsg -> IO ()
 handleClientMessages state _ = \case
-    SetLightState lId lState -> run $ setState lId lState
-    SetAllState lState       -> run $ setAllState lState
-    ResetAll                 -> run resetColors
-    Alert lId                -> run $ alertLight lId
-    where run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
+    SetLightState lId lState ->
+        handlePowerBrightness state lId lState >>= run . setState lId
+    SetAllState lState -> everyLightState lState
+    ResetAll           -> run resetColors
+    Alert lId          -> run $ alertLight lId
+  where
+    run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
+    -- | Send an update to every light at once, unless a brightness
+    -- adjustment is necessary(see `handlePowerBrightness`).
+    everyLightState lState = do
+        mValue <- run getLights
+        let ids = case mValue of
+                Just v ->
+                    mapMaybe (readMaybe . T.unpack . fst) $ v ^@.. members
+                Nothing -> []
+        newStates <- mapM
+            (\i -> (i, ) <$> handlePowerBrightness state i lState)
+            ids
+        if any ((/=) lState . snd) newStates
+            then forM_ newStates $ \(i, s) -> (run $ setState i s)
+            else run $ setAllState lState
+
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> IO ()
 sendDaemonMsg conn = WS.sendTextData conn . encode
@@ -102,6 +130,48 @@ sendDaemonMsg conn = WS.sendTextData conn . encode
 --broadcastDaemonMsg state msg = do
 --    clients <- daemonClients <$> readMVar state
 --    forM_ clients $ \(_, conn) -> sendDaemonMsg conn msg
+
+
+-- | When toggling the power off while setting a custom transition time,
+-- the light(s) will transition to a brightness of 1 before turning
+-- themselves off. If they are turned on with no brightness specified, they
+-- will be at a brightness of 1(out of 254).
+--
+-- To avoid this, we check to see if a power off w/ transition is being
+-- applied. If so, we store the specified brightness, or the current one if
+-- unspecified. When a light is turned on, we clear out the stored
+-- brightness and use it to set the light brightness if unspecified in the
+-- `StateUpdate`.
+handlePowerBrightness
+    :: MVar DaemonState -> Int -> StateUpdate -> IO StateUpdate
+handlePowerBrightness state lId update =
+    case (suPower update, suTransitionTime update) of
+        (Just Off, Just _) -> do
+            storeBrightness =<< case suBrightness update of
+                Just brightness -> return brightness
+                Nothing ->
+                    fmap fromIntegral <$> run (getLightBrightness lId) >>= \case
+                        Nothing  -> return 1
+                        Just bri -> return $ unscaleBrightness bri
+            return update
+        (Just On, _) -> do
+            storedBrightness <- getAndDeleteBrightness
+            case (suBrightness update, storedBrightness) of
+                (Nothing, Just bri) ->
+                    return $ update { suBrightness = Just bri }
+                _ -> return update
+        _ -> return update
+  where
+    run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
+    storeBrightness bri = modifyMVar_ state $ \s -> return s
+        { daemonStoredBrightness = Map.insert lId bri $ daemonStoredBrightness s
+        }
+    getAndDeleteBrightness = modifyMVar state $ \s ->
+        let (bri, updatedMap) =
+                Map.updateLookupWithKey (\_ _ -> Nothing) lId
+                    $ daemonStoredBrightness s
+        in  return (s { daemonStoredBrightness = updatedMap }, bri)
+
 
 
 -- Account Creation

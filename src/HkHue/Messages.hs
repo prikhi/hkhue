@@ -5,6 +5,7 @@ module HkHue.Messages
     , DaemonMsg(..)
     , StateUpdate(..)
     , RGBColor(..)
+    , LightPower(..)
     )
 where
 
@@ -40,11 +41,15 @@ data RGBColor = RGBColor
               , cBlue :: Int
               } deriving (Data, Typeable, Generic, Show, Eq)
 
+data LightPower = On | Off
+                 deriving (Data, Typeable, Generic, Show, Eq)
+
 data StateUpdate = StateUpdate
                  { suColor :: Maybe RGBColor
                  , suBrightness :: Maybe Int
                  , suColorTemperature :: Maybe Int
                  , suTransitionTime :: Maybe Int
+                 , suPower :: Maybe LightPower
                  } deriving (Data, Typeable, Generic, Show, Eq)
 
 -- Aeson Classes
@@ -58,6 +63,9 @@ instance ToJSON DaemonMsg where
 
 instance FromJSON RGBColor
 instance ToJSON RGBColor where
+    toEncoding = genericToEncoding defaultOptions
+instance FromJSON LightPower
+instance ToJSON LightPower where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON StateUpdate
 instance ToJSON StateUpdate where
