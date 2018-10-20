@@ -179,18 +179,17 @@ toXY r g b =
 stateUpdateToHueJSON :: StateUpdate -> Value
 stateUpdateToHueJSON StateUpdate {..} =
     object
-        $  maybeValue
-               (\(RGBColor r g b) -> "xy"
-                   .= toXY (scaleChannel r) (scaleChannel g) (scaleChannel b)
+        $  maybeField
+               "xy"
+               (\(RGBColor r g b) ->
+                   toXY (scaleChannel r) (scaleChannel g) (scaleChannel b)
                )
                suColor
         ++ maybeField "bri"            scaleBrightness suBrightness
         ++ maybeField "ct"             scaleColorTemp  suColorTemperature
         ++ maybeField "transitiontime" id              suTransitionTime
         ++ maybeField "on"             (On ==)         suPower
-  where
-    maybeValue f = maybe [] (\x -> [f x])
-    maybeField k f = maybe [] (\x -> [k .= f x])
+    where maybeField k f = maybe [] (\x -> [k .= f x])
 
 
 makeRequest :: T.Text -> T.Text -> String
