@@ -18,9 +18,7 @@ module HkHue.Client
     )
 where
 
-import           Control.Lens                   ( (^?)
-                                                --, (^@..)
-                                                )
+import           Control.Lens                   ( (^?) )
 import           Control.Monad.Reader           ( ReaderT
                                                 , runReaderT
                                                 , asks
@@ -30,8 +28,6 @@ import           Data.Aeson                     ( (.=)
                                                 , Value
                                                 , object
                                                 )
---import           Data.Aeson.Types               ( emptyArray )
-
 import           Data.Aeson.Lens                ( key
                                                 , nth
                                                 --, members
@@ -39,7 +35,6 @@ import           Data.Aeson.Lens                ( key
                                                 , _Integer
                                                 , _JSON
                                                 )
---import           Data.Maybe                     ( fromMaybe )
 import           Data.Ratio                     ( (%) )
 import           Network.Wreq
 
