@@ -102,9 +102,10 @@ handleClientMessages
 handleClientMessages state _ = \case
     SetLightState lId lState ->
         handlePowerBrightness state lId lState >>= run . setState lId
-    SetAllState lState -> everyLightState lState
-    ResetAll           -> run resetColors
-    Alert lId          -> run $ alertLight lId
+    SetLightName lId lName -> run $ setName lId lName
+    SetAllState lState     -> everyLightState lState
+    ResetAll               -> run resetColors
+    Alert lId              -> run $ alertLight lId
   where
     run cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
     -- | Send an update to every light at once, unless a brightness

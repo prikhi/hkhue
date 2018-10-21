@@ -70,6 +70,10 @@ data ClientMode = SetLight
                     , transitionTime :: Maybe Int
                     , lightPower :: Maybe LightPower
                     }
+                | SetName
+                    { light :: Int
+                    , lName :: String
+                    }
                 | AlertLight
                     { light :: Int
                     }
@@ -95,6 +99,7 @@ dispatch = \case
             , suTransitionTime   = transitionTime
             , suPower            = lightPower
             }
+    SetName {..}    -> (`sendClientMsg` SetLightName light (T.pack lName))
     AlertLight {..} -> (`sendClientMsg` Alert light)
     SetAll {..}     -> setAllState StateUpdate
         { suColor            = color
@@ -121,7 +126,7 @@ setLightState lId stateUpdate conn =
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setLight, alert, setAll, reset]
+    modes_ [setLight, setName, alert, setAll, reset]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
@@ -173,6 +178,16 @@ setLight =
             ]
         += name "set-light"
         += help "Set the state of a specific light."
+
+setName :: Annotate Ann
+setName =
+    record
+            (SetName def def)
+            [ light := def += argPos 0 += typ "LIGHT_ID"
+            , lName := def += argPos 1 += typ "NAME"
+            ]
+        += name "set-name"
+        += help "Set the name of a specific light."
 
 alert :: Annotate Ann
 alert =

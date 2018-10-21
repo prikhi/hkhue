@@ -21,6 +21,7 @@ import           GHC.Generics
 import qualified Data.Text                     as T
 
 data ClientMsg = SetLightState { lightId :: Int, lightState :: StateUpdate }
+               | SetLightName { lightId :: Int, lightName :: T.Text }
                | SetAllState { lightState :: StateUpdate }
                | ResetAll
                | Alert { lightId :: Int }

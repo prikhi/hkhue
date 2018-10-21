@@ -8,6 +8,7 @@ module HkHue.Client
     , getLightBrightness
     , alertLight
     , setState
+    , setName
     , setAllState
     , resetColors
     , scaleBrightness
@@ -113,6 +114,14 @@ setState lightNumber stateUpdate = do
         .   (`put` stateUpdateToHueJSON stateUpdate)
     liftIO (print response)
 
+-- | Set the name of a light
+setName :: Int -> T.Text -> HueClient ()
+setName lightNumber newName = do
+    response <-
+        makeAuthRequest ("lights/" <> T.pack (show lightNumber))
+        >>= liftIO
+        .   (`put` object ["name" .= newName])
+    liftIO (print response)
 
 -- Groups
 

@@ -19,8 +19,11 @@ Dunno exactly what I want but probably most of this:
 
 * Basic usage
   * Query light status - id, name, on/off, color, brightness
-  * Light renaming
-    * Support using light names instead of ID numbers for all arguments
+  * Support using light names as arguments instead of ID numbers
+    * Change flag to string type, check if name first, if not & all digits
+      check if valid id.
+    * Keep cache of name->id in daemon, reference when passed name as arg, if
+      not exists, update cache & check again, print error if not
   * Create/run preset scenes
     * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
