@@ -16,10 +16,15 @@ import           Control.Concurrent             ( MVar
                                                 , forkIO
                                                 , killThread
                                                 )
-import           Control.Exception              ( finally )
 import           Control.Monad                  ( unless
                                                 , forever
                                                 , forM_
+                                                )
+import           Control.Monad.Catch            ( finally )
+import           Control.Monad.Reader           ( ReaderT
+                                                , runReaderT
+                                                , ask
+                                                , liftIO
                                                 )
 import           Data.Aeson                     ( encode
                                                 , eitherDecode'
@@ -62,10 +67,22 @@ main = do
     state <-
         newMVar $ DaemonState config [] (ClientId 1) Map.empty $ BridgeState
             Map.empty
-    bridgeSyncThread <- forkIO $ bridgeStateSync state
+    bridgeSyncThread <- forkIO $ runReaderT bridgeStateSync state
     flip finally (killThread bridgeSyncThread)
         $ WS.runServer "0.0.0.0" 9160
         $ application state
+
+
+type App a = ReaderT (MVar DaemonState) IO a
+
+readState :: App DaemonState
+readState = ask >>= \s -> liftIO (readMVar s)
+
+modifyState :: (DaemonState -> IO (DaemonState, a)) -> App a
+modifyState f = ask >>= \s -> liftIO (modifyMVar s f)
+
+modifyState_ :: (DaemonState -> IO DaemonState) -> App ()
+modifyState_ f = ask >>= \s -> liftIO (modifyMVar_ s f)
 
 
 data DaemonState =
@@ -80,70 +97,68 @@ data DaemonState =
 -- Websocket Client Identifiers
 newtype ClientId = ClientId Integer deriving (Eq)
 
-nextClientId :: MVar DaemonState -> IO ClientId
-nextClientId state = modifyMVar state $ \s ->
+nextClientId :: App ClientId
+nextClientId = modifyState $ \s ->
     let cId@(ClientId number) = daemonNextClientId s
     in  return (s { daemonNextClientId = ClientId (number + 1) }, cId)
 
--- | Handle a WS request
+-- | Handle a WS request, storing the Client ID & Connection.
 application :: MVar DaemonState -> WS.ServerApp
-application state pending = do
-    conn <- WS.acceptRequest pending
-    WS.forkPingThread conn 30
-    nextId <- nextClientId state
-    let client = (nextId, conn)
-    flip finally (disconnect state nextId) $ do
-        modifyMVar_ state
+application state pending = flip runReaderT state $ do
+    conn <- liftIO $ WS.acceptRequest pending
+    liftIO $ WS.forkPingThread conn 30
+    clientId <- nextClientId
+    let client = (clientId, conn)
+    flip finally (disconnect clientId) $ do
+        modifyState_
             $ \s -> return s { daemonClients = client : daemonClients s }
-        forever $ eitherDecode' <$> WS.receiveData conn >>= \case
+        forever $ eitherDecode' <$> liftIO (WS.receiveData conn) >>= \case
             Left errorString ->
                 sendDaemonMsg conn . ProtocolError $ T.pack errorString
-            Right msg -> handleClientMessages state client msg
+            Right msg -> handleClientMessages client msg
 
 -- | Remove the client from the client list
-disconnect :: MVar DaemonState -> ClientId -> IO ()
-disconnect state clientId = modifyMVar_ state $ \s -> return s
+disconnect :: ClientId -> App ()
+disconnect clientId = modifyState_ $ \s -> return s
     { daemonClients = filter ((/= clientId) . fst) $ daemonClients s
     }
 
 -- | Make a request to the Hue API.
-runHue :: MVar DaemonState -> HueClient a -> IO a
-runHue state cmd = daemonConfig <$> readMVar state >>= flip runClient cmd
+runHue :: HueClient a -> App a
+runHue cmd = readState >>= liftIO . flip runClient cmd . daemonConfig
 
 -- | Pull & update the `daemonBridgeState` every 60 seconds.
-bridgeStateSync :: MVar DaemonState -> IO ()
-bridgeStateSync state = forever $ do
-    bridgeState <- runHue state getFullBridgeState
-    modifyMVar_ state $ \s -> return s { daemonBridgeState = bridgeState }
-    threadDelay $ 60 * 1000000
+bridgeStateSync :: App ()
+bridgeStateSync = forever $ do
+    bridgeState <- runHue getFullBridgeState
+    modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
+    liftIO . threadDelay $ 60 * 1000000
 
 
 -- Client Messages
 
-handleClientMessages
-    :: MVar DaemonState -> (ClientId, WS.Connection) -> ClientMsg -> IO ()
-handleClientMessages state _ = \case
+handleClientMessages :: (ClientId, WS.Connection) -> ClientMsg -> App ()
+handleClientMessages _ = \case
     SetLightState lId lState ->
-        handlePowerBrightness state lId lState >>= runHue state . setState lId
-    SetLightName lId lName -> runHue state $ setName lId lName
+        handlePowerBrightness lId lState >>= runHue . setState lId
+    SetLightName lId lName -> runHue $ setName lId lName
     SetAllState lState     -> everyLightState lState
-    ResetAll               -> runHue state resetColors
-    Alert lId              -> runHue state $ alertLight lId
+    ResetAll               -> runHue resetColors
+    Alert lId              -> runHue $ alertLight lId
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
+    -- TODO: Use daemonBridgeState to get light ids
     everyLightState lState = do
-        ids <- Map.keys . bridgeLights . daemonBridgeState <$> readMVar state
-        newStates <- mapM
-            (\i -> (i, ) <$> handlePowerBrightness state i lState)
-            ids
+        ids       <- Map.keys . bridgeLights . daemonBridgeState <$> readState
+        newStates <- mapM (\i -> (i, ) <$> handlePowerBrightness i lState) ids
         if any ((/=) lState . snd) newStates
-            then forM_ newStates $ \(i, s) -> (runHue state $ setState i s)
-            else runHue state $ setAllState lState
+            then forM_ newStates $ \(i, s) -> (runHue $ setState i s)
+            else runHue $ setAllState lState
 
 
-sendDaemonMsg :: WS.Connection -> DaemonMsg -> IO ()
-sendDaemonMsg conn = WS.sendTextData conn . encode
+sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()
+sendDaemonMsg conn = liftIO . WS.sendTextData conn . encode
 
 --broadcastDaemonMsg :: MVar DaemonState -> DaemonMsg -> IO ()
 --broadcastDaemonMsg state msg = do
@@ -161,16 +176,15 @@ sendDaemonMsg conn = WS.sendTextData conn . encode
 -- unspecified. When a light is turned on, we clear out the stored
 -- brightness and use it to set the light brightness if unspecified in the
 -- `StateUpdate`.
-handlePowerBrightness
-    :: MVar DaemonState -> Int -> StateUpdate -> IO StateUpdate
-handlePowerBrightness state lId update =
+handlePowerBrightness :: Int -> StateUpdate -> App StateUpdate
+handlePowerBrightness lId update =
     case (suPower update, suTransitionTime update) of
         (Just Off, Just _) -> do
             storeBrightness =<< case suBrightness update of
                 Just brightness -> return brightness
                 Nothing ->
                     fmap fromIntegral
-                        <$> runHue state (getLightBrightness lId)
+                        <$> runHue (getLightBrightness lId)
                         >>= \case
                                 Nothing  -> return 1
                                 Just bri -> return $ unscaleBrightness bri
@@ -183,10 +197,10 @@ handlePowerBrightness state lId update =
                 _ -> return update
         _ -> return update
   where
-    storeBrightness bri = modifyMVar_ state $ \s -> return s
+    storeBrightness bri = modifyState_ $ \s -> return s
         { daemonStoredBrightness = Map.insert lId bri $ daemonStoredBrightness s
         }
-    getAndDeleteBrightness = modifyMVar state $ \s ->
+    getAndDeleteBrightness = modifyState $ \s ->
         let (bri, updatedMap) =
                 Map.updateLookupWithKey (\_ _ -> Nothing) lId
                     $ daemonStoredBrightness s

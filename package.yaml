@@ -65,6 +65,8 @@ executables:
     dependencies:
     - hkhue
     - containers
+    - exceptions
+    - mtl
     - system-fileio
     - system-filepath
     - websockets
