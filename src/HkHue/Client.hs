@@ -12,6 +12,7 @@ module HkHue.Client
     , setName
     , setAllState
     , resetColors
+    , getFullBridgeState
     , scaleColorTemp
     , scaleBrightness
     , unscaleBrightness
@@ -20,7 +21,9 @@ module HkHue.Client
     )
 where
 
-import           Control.Lens                   ( (^?) )
+import           Control.Lens                   ( (^?)
+                                                , (^.)
+                                                )
 import           Control.Monad.Reader           ( ReaderT
                                                 , runReaderT
                                                 , asks
@@ -43,6 +46,7 @@ import           HkHue.Messages                 ( StateUpdate(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 )
+import           HkHue.Types                    ( BridgeState(..) )
 
 import qualified Data.Text                     as T
 
@@ -140,6 +144,15 @@ resetColors = setAllState StateUpdate
     , suTransitionTime   = Nothing
     , suPower            = Just On
     }
+
+-- Configuration
+
+-- | Pull the entire `BridgeState` from the Hue bridge.
+getFullBridgeState :: HueClient BridgeState
+getFullBridgeState = do
+    response <- makeAuthRequest "" >>= liftIO . get
+    liftIO $ print response
+    (^. responseBody) <$> asJSON response
 
 
 -- Color Utils

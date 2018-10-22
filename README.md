@@ -19,6 +19,7 @@ Dunno exactly what I want but probably most of this:
 
 * Basic usage
   * Query light status - id, name, on/off, color, brightness
+  * Scan for new lights
   * Support using light names as arguments instead of ID numbers
     * Change flag to string type, check if name first, if not & all digits
       check if valid id.
@@ -71,9 +72,8 @@ Dunno exactly what I want but probably most of this:
   * Add types for things like LightId, Brightness, Color Temp, &
     Transition  values.
 * Management Daemon
-  * Heartbeat that pulls full state from bridge every 30-120 seconds &
-    light state in smaller intervals. Use values as a cache to improve bridge
-    performance.
+  * Expand heartbeat to pull light state at shorter intervals than full bridge
+    state. Make sure using values as a cache to improve bridge performance.
   * Database for storing color bank, custom effects, scene
   * Manages & cancels long-running effects
 * A GUI for manual control & CLI for scripting

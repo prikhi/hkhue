@@ -34,8 +34,10 @@ ghc-options:
 library:
   source-dirs: src
   dependencies:
+    - containers
     - lens
     - lens-aeson
+    - scientific
     - wreq
     - mtl
 
@@ -63,8 +65,6 @@ executables:
     dependencies:
     - hkhue
     - containers
-    - lens
-    - lens-aeson
     - system-fileio
     - system-filepath
     - websockets
