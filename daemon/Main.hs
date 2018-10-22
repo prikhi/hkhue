@@ -44,8 +44,11 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
                                                 , StateUpdate(..)
                                                 , LightPower(..)
+                                                , LightIdentifier(..)
                                                 )
-import           HkHue.Types                    ( BridgeState(..) )
+import           HkHue.Types                    ( BridgeState(..)
+                                                , BridgeLight(..)
+                                                )
 
 import qualified Data.Map.Strict               as Map
 import qualified Data.Text                     as T
@@ -102,6 +105,21 @@ nextClientId = modifyState $ \s ->
     let cId@(ClientId number) = daemonNextClientId s
     in  return (s { daemonNextClientId = ClientId (number + 1) }, cId)
 
+-- | Convert a `LightIdentifier` into the bridge's Light ID using the
+-- BridgeState to convert from Names to IDs.
+fromLightIdentifier :: LightIdentifier -> App Int
+fromLightIdentifier = \case
+    LightId   i -> return i
+    LightName n -> do
+        lights <- bridgeLights . daemonBridgeState <$> readState
+        case Map.foldrWithKey (findName n) Nothing lights of
+            Just i  -> return i
+            Nothing -> return 0
+  where
+    findName n i lightData = \case
+        Just x  -> Just x
+        Nothing -> if blName lightData == n then Just i else Nothing
+
 -- | Handle a WS request, storing the Client ID & Connection.
 application :: MVar DaemonState -> WS.ServerApp
 application state pending = flip runReaderT state $ do
@@ -139,12 +157,14 @@ bridgeStateSync = forever $ do
 
 handleClientMessages :: (ClientId, WS.Connection) -> ClientMsg -> App ()
 handleClientMessages _ = \case
-    SetLightState lId lState ->
-        handlePowerBrightness lId lState >>= runHue . setState lId
-    SetLightName lId lName -> runHue $ setName lId lName
-    SetAllState lState     -> everyLightState lState
-    ResetAll               -> runHue resetColors
-    Alert lId              -> runHue $ alertLight lId
+    SetLightState lId lState -> do
+        i <- fromLightIdentifier lId
+        handlePowerBrightness i lState >>= runHue . setState i
+    SetLightName lId lName ->
+        fromLightIdentifier lId >>= runHue . flip setName lName
+    SetAllState lState -> everyLightState lState
+    ResetAll           -> runHue resetColors
+    Alert lId          -> fromLightIdentifier lId >>= runHue . alertLight
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).

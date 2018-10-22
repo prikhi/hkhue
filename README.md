@@ -9,8 +9,9 @@ There is a daemon & CLI client, which currently supports:
 
 * Identifying lights by blinking them on & off.
 * Reseting all the lights to their default color temperature & brightness.
-* Setting the Brightness & Color-Temperature/RGB of a specific light or all
-  lights - with custom light-state transition times.
+* Setting the name of a light.
+* Setting the Brightness & Color-Temperature/RGB of a specific light(by name or
+  number) or all lights - with custom light-state transition times.
 
 
 ## Ideas
@@ -20,11 +21,6 @@ Dunno exactly what I want but probably most of this:
 * Basic usage
   * Query light status - id, name, on/off, color, brightness
   * Scan for new lights
-  * Support using light names as arguments instead of ID numbers
-    * Change flag to string type, check if name first, if not & all digits
-      check if valid id.
-    * Keep cache of name->id in daemon, reference when passed name as arg, if
-      not exists, update cache & check again, print error if not
   * Create/run preset scenes
     * Scenes on Hue Bridge or in own database?
     * Play scene but don't change current brightness!
@@ -41,6 +37,9 @@ Dunno exactly what I want but probably most of this:
     like "1s", "30m", "2h"
   * Show errors! "Can't reach bridge", "Can't reach daemon", "Invalid color
     channel value", etc.
+  * Refactor DaemonState into separate module(as opaque type?). Ensure all Hue
+    API requests update the daemonBridgeState. E.g, so we can set name &
+    immediately use it instead of having to wait for bridge sync.
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
     * Currently have a script that slowly increases brightness & color
@@ -70,7 +69,7 @@ Dunno exactly what I want but probably most of this:
   * More function/API docs
   * Add CLI examples to README
   * Add types for things like LightId, Brightness, Color Temp, &
-    Transition  values.
+    Transition values.
 * Management Daemon
   * Expand heartbeat to pull light state at shorter intervals than full bridge
     state. Make sure using values as a cache to improve bridge performance.
@@ -109,6 +108,9 @@ PATH="~/.local/bin:${PATH}"
 hkhue set-all --on --color-temperature 2500 --brightness 75 --transition-time 300
 hkhue alert 1
 hkhue set-light 1 --color 255,0,255 -b 100 -t 100
+hkhue alert 2
+hkhue set-name 2 desk
+hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"     # 10 minute transition
 ```
 
 To see all available commands & flags, run `hkhue --help` or `hkhue <command>

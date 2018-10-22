@@ -3,9 +3,10 @@
 module HkHue.Messages
     ( ClientMsg(..)
     , DaemonMsg(..)
-    , StateUpdate(..)
+    , LightIdentifier(..)
     , RGBColor(..)
     , LightPower(..)
+    , StateUpdate(..)
     )
 where
 
@@ -21,11 +22,11 @@ import           GHC.Generics
 import qualified Data.Text                     as T
 
 data ClientMsg
-    = SetLightState { lightId :: Int, lightState :: StateUpdate }
-    | SetLightName { lightId :: Int, lightName :: T.Text }
+    = SetLightState { lightId :: LightIdentifier, lightState :: StateUpdate }
+    | SetLightName { lightId :: LightIdentifier, lightName :: T.Text }
     | SetAllState { lightState :: StateUpdate }
     | ResetAll
-    | Alert { lightId :: Int }
+    | Alert { lightId :: LightIdentifier }
     deriving (Generic, Show)
 
 
@@ -38,6 +39,10 @@ newtype DaemonMsg
 
 -- Accessory Types
 
+data LightIdentifier
+    = LightId Int
+    | LightName T.Text
+    deriving (Data, Typeable, Generic, Show, Eq)
 
 data RGBColor
     = RGBColor
@@ -70,6 +75,9 @@ instance FromJSON DaemonMsg
 instance ToJSON DaemonMsg where
     toEncoding = genericToEncoding defaultOptions
 
+instance FromJSON LightIdentifier
+instance ToJSON LightIdentifier where
+    toEncoding = genericToEncoding defaultOptions
 instance FromJSON RGBColor
 instance ToJSON RGBColor where
     toEncoding = genericToEncoding defaultOptions

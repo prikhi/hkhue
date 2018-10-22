@@ -29,9 +29,11 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , typ
                                                 , summary
                                                 )
+import           Text.Read                      ( readMaybe )
 
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , StateUpdate(..)
+                                                , LightIdentifier(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 )
@@ -63,7 +65,7 @@ sendClientMsg conn = WS.sendTextData conn . encode
 -- Command Modes
 
 data ClientMode = SetLight
-                    { light :: Int
+                    { light :: String
                     , color :: Maybe RGBColor
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
@@ -71,11 +73,11 @@ data ClientMode = SetLight
                     , lightPower :: Maybe LightPower
                     }
                 | SetName
-                    { light :: Int
+                    { light :: String
                     , lName :: String
                     }
                 | AlertLight
-                    { light :: Int
+                    { light :: String
                     }
                 | SetAll
                     { color :: Maybe RGBColor
@@ -87,11 +89,15 @@ data ClientMode = SetLight
                 | Reset
                 deriving (Data, Typeable, Show, Eq)
 
+parseLight :: String -> LightIdentifier
+parseLight s = case readMaybe s of
+    Nothing -> LightName $ T.pack s
+    Just i  -> LightId i
 
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
     SetLight {..} -> setLightState
-        light
+        (parseLight light)
         StateUpdate
             { suColor            = color
             , suBrightness       = brightness
@@ -99,8 +105,9 @@ dispatch = \case
             , suTransitionTime   = transitionTime
             , suPower            = lightPower
             }
-    SetName {..}    -> (`sendClientMsg` SetLightName light (T.pack lName))
-    AlertLight {..} -> (`sendClientMsg` Alert light)
+    SetName {..} ->
+        (`sendClientMsg` SetLightName (parseLight light) (T.pack lName))
+    AlertLight {..} -> (`sendClientMsg` Alert (parseLight light))
     SetAll {..}     -> setAllState StateUpdate
         { suColor            = color
         , suBrightness       = brightness
@@ -117,7 +124,7 @@ dispatch = \case
 setAllState :: StateUpdate -> WSDispatch
 setAllState stateUpdate conn = sendClientMsg conn $ SetAllState stateUpdate
 
-setLightState :: Int -> StateUpdate -> WSDispatch
+setLightState :: LightIdentifier -> StateUpdate -> WSDispatch
 setLightState lId stateUpdate conn =
     sendClientMsg conn $ SetLightState lId stateUpdate
 
@@ -136,7 +143,7 @@ setLight :: Annotate Ann
 setLight =
     record
             (SetLight def def def def def def)
-            [ light := def += argPos 0 += typ "LIGHT_ID"
+            [ light := def += argPos 0 += typ "LIGHT"
             , color
             := def
             += name "color"
@@ -183,7 +190,7 @@ setName :: Annotate Ann
 setName =
     record
             (SetName def def)
-            [ light := def += argPos 0 += typ "LIGHT_ID"
+            [ light := def += argPos 0 += typ "LIGHT"
             , lName := def += argPos 1 += typ "NAME"
             ]
         += name "set-name"
@@ -191,7 +198,7 @@ setName =
 
 alert :: Annotate Ann
 alert =
-    record (AlertLight def) [light := def += argPos 0 += typ "LIGHT_ID"]
+    record (AlertLight def) [light := def += argPos 0 += typ "LIGHT"]
         += name "alert"
         += help "Toggle a specific light, then return to the current state."
 
