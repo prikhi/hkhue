@@ -10,6 +10,7 @@ module HkHue.Client
     , alertLight
     , setState
     , setName
+    , searchForLights
     , setAllState
     , resetColors
     , getFullBridgeState
@@ -123,6 +124,14 @@ setName lightNumber newName = do
         .   (`put` object ["name" .= newName])
     liftIO (print response)
 
+-- | Scan for new lights & assign them to the bridge
+searchForLights :: HueClient ()
+searchForLights =
+    makeAuthRequest "lights"
+        >>= liftIO
+        .   flip post ([] :: [FormParam])
+        >>= liftIO
+        .   print
 
 -- Groups
 

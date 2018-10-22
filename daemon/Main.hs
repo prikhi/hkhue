@@ -165,6 +165,7 @@ handleClientMessages _ = \case
     SetAllState lState -> everyLightState lState
     ResetAll           -> runHue resetColors
     Alert lId          -> fromLightIdentifier lId >>= runHue . alertLight
+    ScanLights         -> runHue searchForLights
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).

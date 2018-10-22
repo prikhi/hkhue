@@ -87,6 +87,7 @@ data ClientMode = SetLight
                     , lightPower :: Maybe LightPower
                     }
                 | Reset
+                | Scan
                 deriving (Data, Typeable, Show, Eq)
 
 parseLight :: String -> LightIdentifier
@@ -116,6 +117,7 @@ dispatch = \case
         , suPower            = lightPower
         }
     Reset -> (`sendClientMsg` ResetAll)
+    Scan  -> (`sendClientMsg` ScanLights)
 
 
 
@@ -133,7 +135,7 @@ setLightState lId stateUpdate conn =
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setLight, setName, alert, setAll, reset]
+    modes_ [setLight, setName, alert, setAll, reset, scan]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
@@ -251,3 +253,7 @@ setAll =
 reset :: Annotate Ann
 reset = record Reset [] += name "reset" += help
     "Reset all lights to the default color temperature of 2700K."
+
+scan :: Annotate Ann
+scan = record Scan [] += name "scan" += help
+    "Scan for new lights and add them to the bridge."

@@ -12,6 +12,7 @@ There is a daemon & CLI client, which currently supports:
 * Setting the name of a light.
 * Setting the Brightness & Color-Temperature/RGB of a specific light(by name or
   number) or all lights - with custom light-state transition times.
+* Scanning for new lights & associating them with the bridge.
 
 
 ## Ideas
@@ -20,7 +21,6 @@ Dunno exactly what I want but probably most of this:
 
 * Basic usage
   * Query light status - id, name, on/off, color, brightness
-  * Scan for new lights
   * Create/run preset scenes
     * Scenes on Hue Bridge or in own database?
     * Play scene but don't change current brightness!
@@ -65,9 +65,9 @@ Dunno exactly what I want but probably most of this:
   * Better bridge pairing flow(prompt user through UI apps, not daemon),
     autodiscovering
   * Support multiple bridges & cross-bridge scenes
+  * `scan` command should wait 40s & print out any newly discovered lights.
 * Code cleanup
   * More function/API docs
-  * Add CLI examples to README
   * Add types for things like LightId, Brightness, Color Temp, &
     Transition values.
 * Management Daemon

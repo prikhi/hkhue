@@ -27,6 +27,7 @@ data ClientMsg
     | SetAllState { lightState :: StateUpdate }
     | ResetAll
     | Alert { lightId :: LightIdentifier }
+    | ScanLights
     deriving (Generic, Show)
 
 
