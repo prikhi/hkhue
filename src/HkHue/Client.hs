@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module HkHue.Client
     ( HueConfig(..)
+    , HueClient
     , runClient
     , registerWithBridge
     , getLights
@@ -11,6 +12,7 @@ module HkHue.Client
     , setName
     , setAllState
     , resetColors
+    , scaleColorTemp
     , scaleBrightness
     , unscaleBrightness
     , scaleChannel
@@ -30,7 +32,6 @@ import           Data.Aeson                     ( (.=)
                                                 )
 import           Data.Aeson.Lens                ( key
                                                 , nth
-                                                --, members
                                                 , _String
                                                 , _Integer
                                                 , _JSON
@@ -74,6 +75,7 @@ registerWithBridge bridgeHost applicationName deviceName = do
         .  key "username"
         .  _String
 
+
 -- Lights
 
 getLights :: HueClient (Maybe Value)
@@ -89,7 +91,6 @@ getLightBrightness lId = do
         makeAuthRequest ("lights/" <> T.pack (show lId)) >>= liftIO . get
     liftIO $ print response
     return $ response ^? responseBody . key "state" . key "bri" . _Integer
-
 
 -- | Use the alert effect to cycle one light on/off.
 alertLight :: Int -> HueClient ()
@@ -117,6 +118,7 @@ setName lightNumber newName = do
         >>= liftIO
         .   (`put` object ["name" .= newName])
     liftIO (print response)
+
 
 -- Groups
 

@@ -51,6 +51,7 @@ main = do
     -- TODO: If no known account, we send clients an "auth needed" message
     -- on connect, asking them to specify bridge host & press button to
     -- make account. That way daemon can start run without manual input.
+    -- TODO: Bridge autodiscovery
     bridgeHost <- getArgs >>= \case
         []    -> putStrLn "Usage: hkhue <bridge-ip>" >> exitFailure
         b : _ -> return $ T.pack b
@@ -66,14 +67,16 @@ data DaemonState =
                     , daemonStoredBrightness :: Map.Map Int Int
                     }
 
+
+-- Websocket Client Identifiers
 newtype ClientId = ClientId Integer deriving (Eq)
+
 nextClientId :: MVar DaemonState -> IO ClientId
 nextClientId state = modifyMVar state $ \s ->
     let cId@(ClientId number) = daemonNextClientId s
     in  return (s { daemonNextClientId = ClientId (number + 1) }, cId)
 
-
-
+-- | Handle a WS request
 application :: MVar DaemonState -> WS.ServerApp
 application state pending = do
     conn <- WS.acceptRequest pending
