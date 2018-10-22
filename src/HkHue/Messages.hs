@@ -20,38 +20,46 @@ import           GHC.Generics
 
 import qualified Data.Text                     as T
 
-data ClientMsg = SetLightState { lightId :: Int, lightState :: StateUpdate }
-               | SetLightName { lightId :: Int, lightName :: T.Text }
-               | SetAllState { lightState :: StateUpdate }
-               | ResetAll
-               | Alert { lightId :: Int }
-               deriving (Generic, Show)
+data ClientMsg
+    = SetLightState { lightId :: Int, lightState :: StateUpdate }
+    | SetLightName { lightId :: Int, lightName :: T.Text }
+    | SetAllState { lightState :: StateUpdate }
+    | ResetAll
+    | Alert { lightId :: Int }
+    deriving (Generic, Show)
 
 
 -- Daemon Messages
 
-newtype DaemonMsg = ProtocolError T.Text
-                    deriving (Generic, Show)
+newtype DaemonMsg
+    = ProtocolError T.Text
+    deriving (Generic, Show)
 
 
 -- Accessory Types
 
-data RGBColor = RGBColor
-              { cRed :: Int
-              , cGreen :: Int
-              , cBlue :: Int
-              } deriving (Data, Typeable, Generic, Show, Eq)
 
-data LightPower = On | Off
-                 deriving (Data, Typeable, Generic, Show, Eq)
+data RGBColor
+    = RGBColor
+        { cRed :: Int
+        , cGreen :: Int
+        , cBlue :: Int
+        } deriving (Data, Typeable, Generic, Show, Eq)
 
-data StateUpdate = StateUpdate
-                 { suColor :: Maybe RGBColor
-                 , suBrightness :: Maybe Int
-                 , suColorTemperature :: Maybe Int
-                 , suTransitionTime :: Maybe Int
-                 , suPower :: Maybe LightPower
-                 } deriving (Data, Typeable, Generic, Show, Eq)
+data LightPower
+    = On
+    | Off
+    deriving (Data, Typeable, Generic, Show, Eq)
+
+data StateUpdate
+    = StateUpdate
+        { suColor :: Maybe RGBColor
+        , suBrightness :: Maybe Int
+        , suColorTemperature :: Maybe Int
+        , suTransitionTime :: Maybe Int
+        , suPower :: Maybe LightPower
+        } deriving (Data, Typeable, Generic, Show, Eq)
+
 
 -- Aeson Classes
 
