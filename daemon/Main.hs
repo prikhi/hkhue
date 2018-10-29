@@ -16,11 +16,13 @@ import           Control.Concurrent             ( MVar
                                                 , forkIO
                                                 , killThread
                                                 )
+import           Control.Exception.Safe         ( handleAny
+                                                , finally
+                                                )
 import           Control.Monad                  ( unless
                                                 , forever
                                                 , forM_
                                                 )
-import           Control.Monad.Catch            ( finally )
 import           Control.Monad.Reader           ( ReaderT
                                                 , runReaderT
                                                 , ask
@@ -147,7 +149,7 @@ runHue cmd = readState >>= liftIO . flip runClient cmd . daemonConfig
 
 -- | Pull & update the `daemonBridgeState` every 60 seconds.
 bridgeStateSync :: App ()
-bridgeStateSync = forever $ do
+bridgeStateSync = handleAny (const bridgeStateSync) . forever $ do
     bridgeState <- runHue getFullBridgeState
     modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
     liftIO . threadDelay $ 60 * 1000000
