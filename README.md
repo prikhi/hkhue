@@ -40,6 +40,8 @@ Dunno exactly what I want but probably most of this:
   * Refactor DaemonState into separate module(as opaque type?). Ensure all Hue
     API requests update the daemonBridgeState. E.g, so we can set name &
     immediately use it instead of having to wait for bridge sync.
+  * Add `--wait` flag to `set-` functions that waits until
+    transition is complete before returning.
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
     * Currently have a script that slowly increases brightness & color
@@ -60,6 +62,8 @@ Dunno exactly what I want but probably most of this:
       instead of daemon command would let us keep remote redshift instances in
       sync.
       * Pick light or average last color temp of every light.
+      * Run forever, setting redshift every minute or so.
+      * Need to see if bridge continuously updates colors during transition.
 * Not so urgent
   * Similar commands for controlling groups
   * Better bridge pairing flow(prompt user through UI apps, not daemon),
