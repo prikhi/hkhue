@@ -54,6 +54,7 @@ executables:
     - bytestring
     - cmdargs
     - network
+    - safe-exceptions
     - typed-process
     - websockets
 

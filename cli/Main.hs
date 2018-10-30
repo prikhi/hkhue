@@ -2,12 +2,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main
     ( main
     )
 where
 
 import           Control.Concurrent             ( threadDelay )
+import           Control.Exception.Safe         ( try )
 import           Control.Monad                  ( forever
                                                 , when
                                                 )
@@ -16,6 +18,9 @@ import           Data.Aeson                     ( encode
                                                 )
 import           Data.Data                      ( Data )
 import           Data.Typeable                  ( Typeable )
+import           GHC.IO.Exception               ( IOException(ioe_type)
+                                                , IOErrorType(NoSuchThing)
+                                                )
 import           Network.Socket                 ( withSocketsDo )
 import           System.Console.CmdArgs         ( Annotate(..)
                                                 , Ann
@@ -154,10 +159,11 @@ syncRedshift syncInterval conn = forever $ do
     sendClientMsg conn GetAverageColorTemp
     receiveDaemonMsg conn >>= \case
         Just (AverageColorTemp ct) -> do
-            -- TODO: Catch exception & print error if redshift not found
-            (exitCode, _, stderr) <- readProcess
-                (proc "redshift" ["-P", "-O", show ct])
-            when (exitCode /= ExitSuccess) $ L.putStr stderr
+            try (readProcess (proc "rdshift" ["-P", "-O", show ct])) >>= \case
+                Right (exitCode, _, stderr) ->
+                    when (exitCode /= ExitSuccess) $ L.putStr stderr
+                Left e -> when (ioe_type e == NoSuchThing) $ putStrLn
+                    "Error: Could not find `redshift` executable."
             threadDelay $ syncInterval * 1000000
         x -> putStrLn $ "Received Unexpected Message: " <> show x
 
