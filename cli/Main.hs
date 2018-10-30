@@ -18,6 +18,7 @@ import           Data.Aeson                     ( (.:)
                                                 , withObject
                                                 )
 import           Data.Data                      ( Data )
+import           Data.Maybe                     ( fromMaybe )
 import           Data.Typeable                  ( Typeable )
 import           GHC.IO.Exception               ( IOException(ioe_type)
                                                 , IOErrorType(NoSuchThing)
@@ -123,6 +124,7 @@ data ClientMode = SetLight
                     , colorTemperature :: Maybe Int
                     , transitionTime :: Maybe Int
                     , lightPower :: Maybe LightPower
+                    , wait :: Bool
                     }
                 | SetName
                     { light :: String
@@ -137,6 +139,7 @@ data ClientMode = SetLight
                     , colorTemperature :: Maybe Int
                     , transitionTime :: Maybe Int
                     , lightPower :: Maybe LightPower
+                    , wait :: Bool
                     }
                 | Reset
                 | Scan
@@ -152,28 +155,41 @@ parseLight s = case readMaybe s of
 
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
-    SetLight {..} -> setLightState
-        (parseLight light)
-        StateUpdate
-            { suColor            = color
-            , suBrightness       = brightness
-            , suColorTemperature = colorTemperature
-            , suTransitionTime   = transitionTime
-            , suPower            = lightPower
-            }
+    SetLight {..} -> \conn -> do
+        setLightState
+            (parseLight light)
+            StateUpdate
+                { suColor            = color
+                , suBrightness       = brightness
+                , suColorTemperature = colorTemperature
+                , suTransitionTime   = transitionTime
+                , suPower            = lightPower
+                }
+            conn
+        delayTransition wait transitionTime
     SetName {..} ->
         (`sendClientMsg` SetLightName (parseLight light) (T.pack lName))
     AlertLight {..} -> (`sendClientMsg` Alert (parseLight light))
-    SetAll {..}     -> setAllState StateUpdate
-        { suColor            = color
-        , suBrightness       = brightness
-        , suColorTemperature = colorTemperature
-        , suTransitionTime   = transitionTime
-        , suPower            = lightPower
-        }
+    SetAll {..}     -> \conn -> do
+        setAllState
+            StateUpdate
+                { suColor            = color
+                , suBrightness       = brightness
+                , suColorTemperature = colorTemperature
+                , suTransitionTime   = transitionTime
+                , suPower            = lightPower
+                }
+            conn
+        delayTransition wait transitionTime
     Reset         -> (`sendClientMsg` ResetAll)
     Scan          -> (`sendClientMsg` ScanLights)
     Redshift {..} -> syncRedshift interval
+  where
+    delayTransition wait transitionTime =
+        when wait . threadDelay $ transitionDelayTime transitionTime
+    -- | Convert a 100ms int into seconds for thread delay, adding a 0.5s
+    -- padding to make up for bridge response times.
+    transitionDelayTime maybeTime = fromMaybe 4 maybeTime * 100000 + 500000
 
 
 
@@ -214,7 +230,7 @@ arguments =
 setLight :: Annotate Ann
 setLight =
     record
-            (SetLight def def def def def def)
+            (SetLight def def def def def def def)
             [ light := def += argPos 0 += typ "LIGHT"
             , color
             := def
@@ -254,6 +270,8 @@ setLight =
                 [ atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
+            , wait := False += name "wait" += name "w" += explicit += help
+                "Wait for transition to complete before exiting."
             ]
         += name "set-light"
         += help "Set the state of a specific light."
@@ -277,7 +295,7 @@ alert =
 setAll :: Annotate Ann
 setAll =
     record
-            (SetAll def def def def def)
+            (SetAll def def def def def def)
             [ color
             := def
             += name "color"
@@ -316,6 +334,8 @@ setAll =
                 [ atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
+            , wait := False += name "wait" += name "w" += explicit += help
+                "Wait for transition to complete before exiting."
             ]
         += name "set-all"
         += help "Set the state of all lights."

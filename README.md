@@ -40,8 +40,6 @@ Dunno exactly what I want but probably most of this:
   * Refactor DaemonState into separate module(as opaque type?). Ensure all Hue
     API requests update the daemonBridgeState. E.g, so we can set name &
     immediately use it instead of having to wait for bridge sync.
-  * Add `--wait` flag to `set-` functions that waits until
-    transition is complete before returning.
   * Clean Up Daemon Output, Support Log File or Verbosity Switches?
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
@@ -116,6 +114,9 @@ hkhue redshift --interval 20 &
 # Transition to 6000K over 10 minutes
 hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"
 ```
+
+You can install just the daemon or client by running `stack install
+hkhue:exe:hkhue` or `stack install hkhue:exe:hkhued`.
 
 To see all available commands & flags, run `hkhue --help` or `hkhue <command>
 --help`.
