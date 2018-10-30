@@ -28,20 +28,26 @@ import           Control.Monad.Reader           ( ReaderT
                                                 , ask
                                                 , liftIO
                                                 )
-import           Data.Aeson                     ( encode
+import           Data.Aeson                     ( (.:)
+                                                , FromJSON(..)
+                                                , encode
                                                 , eitherDecode'
+                                                , withObject
                                                 )
+import           Data.Default                   ( Default(..) )
 import           Filesystem                     ( isFile
                                                 , createTree
                                                 )
 import           Filesystem.Path.CurrentOS      ( decodeString )
-import           System.Environment             ( getArgs )
 import           System.Environment.XDG.BaseDir ( getUserDataFile
                                                 , getUserDataDir
                                                 )
-import           System.Exit                    ( exitFailure )
 
 import           HkHue.Client
+import           HkHue.Config                   ( getConfig
+                                                , defaultBindAddress
+                                                , defaultBindPort
+                                                )
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
                                                 , StateUpdate(..)
@@ -61,23 +67,30 @@ import qualified Network.WebSockets            as WS
 -- server.
 main :: IO ()
 main = do
-    -- TODO: If no known account, we send clients an "auth needed" message
-    -- on connect, asking them to specify bridge host & press button to
-    -- make account. That way daemon can start run without manual input.
-    -- TODO: Bridge autodiscovery
-    bridgeHost <- getArgs >>= \case
-        []    -> putStrLn "Usage: hkhued <bridge-ip>" >> exitFailure
-        b : _ -> return $ T.pack b
-    account <- getHueAccount bridgeHost
-    let config = HueConfig {hueBridgeHost = bridgeHost, hueAccount = account}
-    state <-
-        newMVar $ DaemonState config [] (ClientId 1) Map.empty $ BridgeState
-            Map.empty
-    bridgeSyncThread <- forkIO $ runReaderT bridgeStateSync state
-    lightsSyncThread <- forkIO $ runReaderT lightStateSync state
+    config  <- getConfig
+    account <- getHueAccount $ configBridgeHost config
+    let hueConfig = HueConfig
+            { hueBridgeHost = configBridgeHost config
+            , hueAccount    = account
+            }
+        bridgeInterval = configBridgeSyncInterval config
+        lightsInterval = configLightsSyncInterval config
+    state <- newMVar DaemonState
+        { daemonHueConfig        = hueConfig
+        , daemonClients          = []
+        , daemonNextClientId     = ClientId 1
+        , daemonStoredBrightness = Map.empty
+        , daemonBridgeState      = BridgeState Map.empty
+        , daemonCacheInterval    = min bridgeInterval lightsInterval
+        }
+    bridgeSyncThread <- forkIO
+        $ runReaderT (bridgeStateSync bridgeInterval) state
+    lightsSyncThread <- forkIO
+        $ runReaderT (lightStateSync lightsInterval) state
     let forkedThreads = [bridgeSyncThread, lightsSyncThread]
     flip finally (mapM_ killThread forkedThreads)
-        $ WS.runServer "0.0.0.0" 9160
+        $ WS.runServer (T.unpack $ configBindHost config)
+                       (configBindPort config)
         $ application state
 
 
@@ -94,11 +107,12 @@ modifyState_ f = ask >>= \s -> liftIO (modifyMVar_ s f)
 
 
 data DaemonState =
-        DaemonState { daemonConfig :: HueConfig
+        DaemonState { daemonHueConfig :: HueConfig
                     , daemonClients :: [(ClientId, WS.Connection)]
                     , daemonNextClientId :: ClientId
                     , daemonStoredBrightness :: Map.Map Int Int
                     , daemonBridgeState :: BridgeState
+                    , daemonCacheInterval :: Int
                     }
 
 
@@ -148,30 +162,26 @@ disconnect clientId = modifyState_ $ \s -> return s
 
 -- | Make a request to the Hue API.
 runHue :: HueClient a -> App a
-runHue cmd = readState >>= liftIO . flip runClient cmd . daemonConfig
-
-brideSyncInterval :: Int
-brideSyncInterval = 60 * 1000000
-
-lightSyncInterval :: Int
-lightSyncInterval = 5 * 1000000
+runHue cmd = readState >>= liftIO . flip runClient cmd . daemonHueConfig
 
 -- | Pull & update the `daemonBridgeState` every 60 seconds.
-bridgeStateSync :: App ()
-bridgeStateSync = handleAny (const bridgeStateSync) . forever $ do
-    bridgeState <- runHue getFullBridgeState
-    modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
-    liftIO $ threadDelay brideSyncInterval
+bridgeStateSync :: Int -> App ()
+bridgeStateSync syncInterval =
+    handleAny (const $ bridgeStateSync syncInterval) . forever $ do
+        bridgeState <- runHue getFullBridgeState
+        modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
+        liftIO . threadDelay $ syncInterval * 1000000
 
 -- | Pull & update the `bridgeLights` map every 5 seconds.
-lightStateSync :: App ()
-lightStateSync = handleAny (const lightStateSync) . forever $ do
-    lightStates <- runHue getFullLightStates
-    modifyState_ $ \s -> return s
-        { daemonBridgeState = (daemonBridgeState s) { bridgeLights = lightStates
-                                                    }
-        }
-    liftIO $ threadDelay lightSyncInterval
+lightStateSync :: Int -> App ()
+lightStateSync syncInterval =
+    handleAny (const $ lightStateSync syncInterval) . forever $ do
+        lightStates <- runHue getFullLightStates
+        modifyState_ $ \s -> return s
+            { daemonBridgeState =
+                (daemonBridgeState s) { bridgeLights = lightStates }
+            }
+        liftIO . threadDelay $ syncInterval * 1000000
 
 -- Client Messages
 
@@ -209,7 +219,11 @@ handleClientMessages (_, conn) = \case
             <$> readState
         case maybeCurrentTemp of
             Nothing ->
-                liftIO (threadDelay brideSyncInterval) >> getAverageColorTemp
+                daemonCacheInterval
+                    <$> readState
+                    >>= liftIO
+                    .   threadDelay
+                    >>  getAverageColorTemp
             Just ct -> sendDaemonMsg conn $ AverageColorTemp ct
     n `safeDiv` d = if d == 0 then Nothing else Just $ n `div` d
 
@@ -263,6 +277,38 @@ handlePowerBrightness lId update =
                     $ daemonStoredBrightness s
         in  return (s { daemonStoredBrightness = updatedMap }, bri)
 
+
+
+-- Config File
+
+
+data DaemonConfig =
+    DaemonConfig { configBridgeHost :: T.Text
+                 , configBindHost :: T.Text
+                 , configBindPort :: Int
+                 , configBridgeSyncInterval :: Int
+                 , configLightsSyncInterval :: Int
+                 }
+
+instance Default DaemonConfig where
+    def =
+        DaemonConfig
+            { configBridgeHost= "philips-hue"
+            , configBindHost = defaultBindAddress
+            , configBindPort = defaultBindPort
+            , configBridgeSyncInterval = 60
+            , configLightsSyncInterval = 5
+            }
+
+instance FromJSON DaemonConfig where
+    parseJSON = withObject "DaemonConfig" $ \o -> do
+        daemonYaml <- o .: "daemon"
+        DaemonConfig
+            <$> daemonYaml .: "bridge-host"
+            <*> o .: "bind-address"
+            <*> o .: "bind-port"
+            <*> daemonYaml .: "bridge-sync-interval"
+            <*> daemonYaml .: "lights-sync-interval"
 
 
 -- Account Creation

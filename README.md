@@ -28,9 +28,7 @@ Dunno exactly what I want but probably most of this:
   * Global/Per-Light increments (brightness & color temp)
   * Specify multiple lights in `set-light` command
   * Dameon Config file
-    * Bridge Host
-    * Bind Address/Port
-    * Bridge Sync Interval
+    * Support overriding config options w/ cli flags
   * CLI Config file
     * Daemon Address/Port
     * Daemon Port
@@ -45,6 +43,7 @@ Dunno exactly what I want but probably most of this:
     immediately use it instead of having to wait for bridge sync.
   * Add `--wait` flag to `set-` functions that waits until
     transition is complete before returning.
+  * Clean Up Daemon Output, Support Log File or Verbosity Switches?
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
     * Currently have a script that slowly increases brightness & color
@@ -94,7 +93,7 @@ Build the applications & start the daemon:
 
 ```sh
 stack build
-stack exec hkhued -- <bridge-ip>
+stack exec hkhued
 ```
 
 Then you can control the lights with the CLI client:
@@ -121,6 +120,28 @@ hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"
 
 To see all available commands & flags, run `hkhue --help` or `hkhue <command>
 --help`.
+
+## Configuration
+
+You can modify the default behavior of the daemon & CLI client by creating a
+config file at `~/.config/hkhue/config.yaml`. Global options are defined at the
+top level while daemon & client options are nested under their respective keys.
+All values are optional and will fall back to the following defaults:
+
+```yaml
+# The Address of the Daemon
+bind-address: 0.0.0.0
+# The Port for the Daemon to Use
+bind-port: 9160
+
+daemon:
+    # The Hostname or Address of the Hue Bridge
+    bridge-host: philips-hue.acorn
+    # Seconds Between Full Bridge State Cache Resyncs
+    bridge-sync-interval: 60
+    # Seconds Between Light State Cache Resyncs
+    lights-sync-interval: 5
+```
 
 ## License
 

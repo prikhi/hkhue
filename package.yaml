@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - text
 - aeson
+- safe-exceptions
 - websockets
 
 ghc-options:
@@ -36,11 +37,16 @@ library:
   source-dirs: src
   dependencies:
     - containers
+    - data-default
     - lens
     - lens-aeson
-    - scientific
-    - wreq
     - mtl
+    - scientific
+    - system-fileio
+    - system-filepath
+    - wreq
+    - xdg-basedir
+    - yaml
 
 executables:
   hkhue:
@@ -55,7 +61,6 @@ executables:
     - bytestring
     - cmdargs
     - network
-    - safe-exceptions
     - typed-process
 
   hkhued:
@@ -68,11 +73,12 @@ executables:
     dependencies:
     - hkhue
     - containers
-    - safe-exceptions
+    - data-default
     - mtl
     - system-fileio
     - system-filepath
     - xdg-basedir
+    - yaml
 
 tests:
   hkhue-test:
