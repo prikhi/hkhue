@@ -23,6 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - text
 - aeson
+- data-default
 - safe-exceptions
 - websockets
 
@@ -37,7 +38,6 @@ library:
   source-dirs: src
   dependencies:
     - containers
-    - data-default
     - lens
     - lens-aeson
     - mtl
@@ -73,12 +73,10 @@ executables:
     dependencies:
     - hkhue
     - containers
-    - data-default
     - mtl
     - system-fileio
     - system-filepath
     - xdg-basedir
-    - yaml
 
 tests:
   hkhue-test:

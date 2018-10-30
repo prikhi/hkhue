@@ -30,8 +30,7 @@ Dunno exactly what I want but probably most of this:
   * Dameon Config file
     * Support overriding config options w/ cli flags
   * CLI Config file
-    * Daemon Address/Port
-    * Daemon Port
+    * Support overriding config options w/ cli flags
   * Add in-depth mode descriptions to CLI `--help` docs
   * Nicer transition-time flag for CLI client - add support for values
     like "1s", "30m", "2h"

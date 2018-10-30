@@ -13,6 +13,10 @@ import           Control.Exception.Safe         ( try )
 import           Control.Monad                  ( forever
                                                 , when
                                                 )
+import           Data.Aeson                     ( (.:)
+                                                , FromJSON(parseJSON)
+                                                , withObject
+                                                )
 import           Data.Data                      ( Data )
 import           Data.Typeable                  ( Typeable )
 import           GHC.IO.Exception               ( IOException(ioe_type)
@@ -43,6 +47,10 @@ import           System.Process.Typed           ( readProcess
                                                 , proc
                                                 )
 
+import           HkHue.Config                   ( getConfig
+                                                , defaultBindAddress
+                                                , defaultBindPort
+                                                )
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
                                                 , StateUpdate(..)
@@ -54,6 +62,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 )
 
 import qualified Data.ByteString.Lazy          as L
+import qualified Data.Default                  as Def
 import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
 
@@ -61,8 +70,31 @@ import qualified Network.WebSockets            as WS
 main :: IO ()
 main = do
     clientMode <- cmdArgs_ arguments
-    withSocketsDo
-        $ WS.runClient "127.0.0.1" 9160 "/" (app $ dispatch clientMode)
+    config     <- getConfig
+    withSocketsDo $ WS.runClient (configDaemonAddress config)
+                                 (configDaemonPort config)
+                                 "/"
+                                 (app $ dispatch clientMode)
+
+
+data ClientConfig
+    = ClientConfig
+        { configDaemonAddress :: String
+        , configDaemonPort :: Int
+        }
+
+instance FromJSON ClientConfig where
+    parseJSON = withObject "ClientConfig" $ \o ->
+        ClientConfig
+            <$> o .: "bind-address"
+            <*> o .: "bind-port"
+
+instance Def.Default ClientConfig where
+    def =
+        ClientConfig
+            { configDaemonAddress = defaultBindAddress
+            , configDaemonPort = defaultBindPort
+            }
 
 
 -- WebSockets

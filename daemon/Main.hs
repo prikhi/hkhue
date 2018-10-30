@@ -89,8 +89,7 @@ main = do
         $ runReaderT (lightStateSync lightsInterval) state
     let forkedThreads = [bridgeSyncThread, lightsSyncThread]
     flip finally (mapM_ killThread forkedThreads)
-        $ WS.runServer (T.unpack $ configBindHost config)
-                       (configBindPort config)
+        $ WS.runServer (configBindHost config) (configBindPort config)
         $ application state
 
 
@@ -284,7 +283,7 @@ handlePowerBrightness lId update =
 
 data DaemonConfig =
     DaemonConfig { configBridgeHost :: T.Text
-                 , configBindHost :: T.Text
+                 , configBindHost :: String
                  , configBindPort :: Int
                  , configBridgeSyncInterval :: Int
                  , configLightsSyncInterval :: Int

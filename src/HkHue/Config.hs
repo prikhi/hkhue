@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 module HkHue.Config
     ( getConfig
     , defaultBindAddress
@@ -18,7 +17,6 @@ import           Filesystem                     ( isFile )
 import           Filesystem.Path.CurrentOS      ( decodeString )
 import           System.Environment.XDG.BaseDir ( getUserConfigFile )
 
-import qualified Data.Text                     as T
 
 getConfig :: (FromJSON a, Default a) => IO a
 getConfig = do
@@ -33,7 +31,7 @@ getConfig = do
             Right c -> return c
         else def
 
-defaultBindAddress :: T.Text
+defaultBindAddress :: String
 defaultBindAddress = "0.0.0.0"
 
 defaultBindPort :: Int
