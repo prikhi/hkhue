@@ -136,7 +136,7 @@ bind-port: 9160
 
 daemon:
     # The Hostname or Address of the Hue Bridge
-    bridge-host: philips-hue.acorn
+    bridge-host: philips-hue
     # Seconds Between Full Bridge State Cache Resyncs
     bridge-sync-interval: 60
     # Seconds Between Light State Cache Resyncs
