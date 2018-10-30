@@ -92,20 +92,20 @@ Dunno exactly what I want but probably most of this:
 
 Build the applications & start the daemon:
 
-```
+```sh
 stack build
 stack exec hkhued -- <bridge-ip>
 ```
 
 Then you can control the lights with the CLI client:
 
-```
+```sh
 stack exec hkhue -- set-all -b 40 -c 255,0,255
 ```
 
-Run `stack install` to install to `~/.local/bin/`:
+Run `stack install` to install the binaries to `~/.local/bin/`:
 
-```
+```sh
 stack install
 PATH="~/.local/bin:${PATH}"
 hkhue set-all --on --color-temperature 2500 --brightness 75 --transition-time 300
@@ -113,7 +113,7 @@ hkhue alert 1
 hkhue set-light 1 --color 255,0,255 -b 100 -t 100
 hkhue alert 2
 hkhue set-name 2 desk
-# Sync redshift in background
+# Sync redshift in the background
 hkhue redshift --interval 20 &
 # Transition to 6000K over 10 minutes
 hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"
