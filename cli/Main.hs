@@ -32,6 +32,7 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , enum_
                                                 , program
                                                 , help
+                                                , details
                                                 , helpArg
                                                 , record
                                                 , def
@@ -324,8 +325,16 @@ reset = record Reset [] += name "reset" += help
     "Reset all lights to the default color temperature of 2700K."
 
 scan :: Annotate Ann
-scan = record Scan [] += name "scan" += help
-    "Scan for new lights and add them to the bridge."
+scan =
+    record Scan []
+        += name "scan"
+        += help "Scan for new lights and add them to the bridge."
+        += details
+               [ "This mode tells the Hue bridge to scan for any unassociated "
+                 <> "lights. While the command will exit immediately, the "
+                 <> "bridge will continue to scan for 40 seconds & any new "
+                 <> "lights will be added during daemon cache re-syncs."
+               ]
 
 redshift :: Annotate Ann
 redshift =
@@ -337,10 +346,18 @@ redshift =
               += name "i"
               += explicit
               += typ "SECONDS"
-              += help "Set the syncing interval in seconds."
+              += help "Set the syncing interval."
             ]
         += name "redshift"
-        += help
-               (  "Sync redshift's color temperature to the color temperature "
-               <> "of your lights."
-               )
+        += help "Sync redshift to your lights."
+        += details
+               [ "This mode starts a forever-running process that "
+               <> "determines the average color temperature of all lights "
+               <> "currently in `Color Temperature` mode & uses redshift to "
+               <> "set your monitor's color temperature."
+               , ""
+               , "Note that the daemon uses it's local cache to calculate the "
+               <> "average color temperature, effectively capping the lower "
+               <> "bound of the `--interval` flag to the daemon's refresh "
+               <> "interval."
+               ]
