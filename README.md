@@ -26,6 +26,7 @@ Dunno exactly what I want but probably most of this:
     * Scenes on Hue Bridge or in own database?
     * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
+  * Specify multiple lights in `set-light` command
   * Dameon Config file
     * Bridge Host
     * Bind Address/Port
@@ -38,6 +39,7 @@ Dunno exactly what I want but probably most of this:
     like "1s", "30m", "2h"
   * Show errors! "Can't reach bridge", "Can't reach daemon", "Invalid color
     channel value", etc.
+    * On client socket exception, print warning & re-run client mode
   * Refactor DaemonState into separate module(as opaque type?). Ensure all Hue
     API requests update the daemonBridgeState. E.g, so we can set name &
     immediately use it instead of having to wait for bridge sync.
@@ -71,8 +73,8 @@ Dunno exactly what I want but probably most of this:
       from redshift
 * Code cleanup
   * More function/API docs
-  * Add types for things like LightId, Brightness, Color Temp, &
-    Transition values.
+  * Add types for things like PercentBrightness, HueBrightness(1-254),
+    ByteChannel(0-255), UnitChannel(0-1), TransitionTime, etc.
 * Management Daemon
   * Expand heartbeat to pull light state at shorter intervals than full bridge
     state. Make sure using values as a cache to improve bridge performance.

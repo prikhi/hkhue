@@ -176,7 +176,6 @@ handleClientMessages (_, conn) = \case
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
-    -- TODO: Use daemonBridgeState to get light ids
     everyLightState lState = do
         ids       <- Map.keys . bridgeLights . daemonBridgeState <$> readState
         newStates <- mapM (\i -> (i, ) <$> handlePowerBrightness i lState) ids
