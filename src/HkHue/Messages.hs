@@ -7,11 +7,18 @@ module HkHue.Messages
     , RGBColor(..)
     , LightPower(..)
     , StateUpdate(..)
+    , sendMessage
+    , receiveMessage
     )
 where
 
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
 import           Data.Aeson                     ( FromJSON
                                                 , ToJSON(..)
+                                                , encode
+                                                , decode
                                                 , genericToEncoding
                                                 , defaultOptions
                                                 )
@@ -20,6 +27,9 @@ import           Data.Typeable                  ( Typeable )
 import           GHC.Generics
 
 import qualified Data.Text                     as T
+import qualified Network.WebSockets            as WS
+
+-- Client Messages
 
 data ClientMsg
     = SetLightState { lightId :: LightIdentifier, lightState :: StateUpdate }
@@ -39,6 +49,17 @@ data DaemonMsg
     | AverageColorTemp Int
     deriving (Generic, Show)
 
+-- Message Helpers
+
+-- | Generic WebSocket Message Sending. The client & daemon should use this
+-- to build functions with more specific types.
+sendMessage :: (ToJSON a, MonadIO m) => WS.Connection -> a -> m ()
+sendMessage conn = liftIO . WS.sendTextData conn . encode
+
+-- | Generic WebSocket Message Receiving. Specialize the types in the
+-- client & daemons.
+receiveMessage :: (FromJSON a, MonadIO m) => WS.Connection -> m (Maybe a)
+receiveMessage conn = liftIO $ decode <$> WS.receiveData conn
 
 -- Accessory Types
 

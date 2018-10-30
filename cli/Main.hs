@@ -13,9 +13,6 @@ import           Control.Exception.Safe         ( try )
 import           Control.Monad                  ( forever
                                                 , when
                                                 )
-import           Data.Aeson                     ( encode
-                                                , decode
-                                                )
 import           Data.Data                      ( Data )
 import           Data.Typeable                  ( Typeable )
 import           GHC.IO.Exception               ( IOException(ioe_type)
@@ -52,6 +49,8 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , LightIdentifier(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
+                                                , sendMessage
+                                                , receiveMessage
                                                 )
 
 import qualified Data.ByteString.Lazy          as L
@@ -76,10 +75,10 @@ app socketConversation conn = do
     WS.sendClose conn ("Quit" :: T.Text)
 
 sendClientMsg :: WS.Connection -> ClientMsg -> IO ()
-sendClientMsg conn = WS.sendTextData conn . encode
+sendClientMsg = sendMessage
 
 receiveDaemonMsg :: WS.Connection -> IO (Maybe DaemonMsg)
-receiveDaemonMsg conn = decode <$> WS.receiveData conn
+receiveDaemonMsg = receiveMessage
 
 
 -- Command Modes
