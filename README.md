@@ -13,6 +13,7 @@ There is a daemon & CLI client, which currently supports:
 * Setting the Brightness & Color-Temperature/RGB of a specific light(by name or
   number) or all lights - with custom light-state transition times.
 * Scanning for new lights & associating them with the bridge.
+* Syncing the color temperature of your lights to redshift.
 
 
 ## Ideas
@@ -57,19 +58,17 @@ Dunno exactly what I want but probably most of this:
   * Party mode
   * Sound reactive
   * Color based on computer monitor
-  * Match Redshift(see `redshift -p | grep Temp`)
-    * Make CLI command that syncs redshift w/ current color temp? CLI command
-      instead of daemon command would let us keep remote redshift instances in
-      sync.
-      * Pick light or average last color temp of every light.
-      * Run forever, setting redshift every minute or so.
-      * Need to see if bridge continuously updates colors during transition.
 * Not so urgent
   * Similar commands for controlling groups
   * Better bridge pairing flow(prompt user through UI apps, not daemon),
     autodiscovering
   * Support multiple bridges & cross-bridge scenes
   * `scan` command should wait 40s & print out any newly discovered lights.
+  * More `redshift` flags:
+    * `--single-light LIGHT_ID`
+    * `--on-only`
+    * `--pull` - instead of pushing color temp to redshift, pull color temp
+      from redshift
 * Code cleanup
   * More function/API docs
   * Add types for things like LightId, Brightness, Color Temp, &
@@ -114,7 +113,10 @@ hkhue alert 1
 hkhue set-light 1 --color 255,0,255 -b 100 -t 100
 hkhue alert 2
 hkhue set-name 2 desk
-hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"     # 10 minute transition
+# Sync redshift in background
+hkhue redshift --interval 20 &
+# Transition to 6000K over 10 minutes
+hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"
 ```
 
 To see all available commands & flags, run `hkhue --help` or `hkhue <command>

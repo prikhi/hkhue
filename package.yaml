@@ -51,8 +51,10 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - hkhue
+    - bytestring
     - cmdargs
     - network
+    - typed-process
     - websockets
 
   hkhued:

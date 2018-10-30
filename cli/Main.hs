@@ -7,7 +7,13 @@ module Main
     )
 where
 
-import           Data.Aeson                     ( encode )
+import           Control.Concurrent             ( threadDelay )
+import           Control.Monad                  ( forever
+                                                , when
+                                                )
+import           Data.Aeson                     ( encode
+                                                , decode
+                                                )
 import           Data.Data                      ( Data )
 import           Data.Typeable                  ( Typeable )
 import           Network.Socket                 ( withSocketsDo )
@@ -30,14 +36,20 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , summary
                                                 )
 import           Text.Read                      ( readMaybe )
+import           System.Exit                    ( ExitCode(ExitSuccess) )
+import           System.Process.Typed           ( readProcess
+                                                , proc
+                                                )
 
 import           HkHue.Messages                 ( ClientMsg(..)
+                                                , DaemonMsg(..)
                                                 , StateUpdate(..)
                                                 , LightIdentifier(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 )
 
+import qualified Data.ByteString.Lazy          as L
 import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
 
@@ -60,6 +72,9 @@ app socketConversation conn = do
 
 sendClientMsg :: WS.Connection -> ClientMsg -> IO ()
 sendClientMsg conn = WS.sendTextData conn . encode
+
+receiveDaemonMsg :: WS.Connection -> IO (Maybe DaemonMsg)
+receiveDaemonMsg conn = decode <$> WS.receiveData conn
 
 
 -- Command Modes
@@ -88,6 +103,9 @@ data ClientMode = SetLight
                     }
                 | Reset
                 | Scan
+                | Redshift
+                    { interval :: Int
+                    }
                 deriving (Data, Typeable, Show, Eq)
 
 parseLight :: String -> LightIdentifier
@@ -116,8 +134,9 @@ dispatch = \case
         , suTransitionTime   = transitionTime
         , suPower            = lightPower
         }
-    Reset -> (`sendClientMsg` ResetAll)
-    Scan  -> (`sendClientMsg` ScanLights)
+    Reset         -> (`sendClientMsg` ResetAll)
+    Scan          -> (`sendClientMsg` ScanLights)
+    Redshift {..} -> syncRedshift interval
 
 
 
@@ -130,12 +149,25 @@ setLightState :: LightIdentifier -> StateUpdate -> WSDispatch
 setLightState lId stateUpdate conn =
     sendClientMsg conn $ SetLightState lId stateUpdate
 
+syncRedshift :: Int -> WSDispatch
+syncRedshift syncInterval conn = forever $ do
+    sendClientMsg conn GetAverageColorTemp
+    receiveDaemonMsg conn >>= \case
+        Just (AverageColorTemp ct) -> do
+            -- TODO: Catch exception & print error if redshift not found
+            (exitCode, _, stderr) <- readProcess
+                (proc "redshift" ["-P", "-O", show ct])
+            when (exitCode /= ExitSuccess) $ L.putStr stderr
+            threadDelay $ syncInterval * 1000000
+        x -> putStrLn $ "Received Unexpected Message: " <> show x
+
+
 
 -- Argument Parsing
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setLight, setName, alert, setAll, reset, scan]
+    modes_ [setLight, setName, alert, setAll, reset, scan, redshift]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
@@ -257,3 +289,21 @@ reset = record Reset [] += name "reset" += help
 scan :: Annotate Ann
 scan = record Scan [] += name "scan" += help
     "Scan for new lights and add them to the bridge."
+
+redshift :: Annotate Ann
+redshift =
+    record
+            (Redshift def)
+            [ interval
+              := 5
+              += name "interval"
+              += name "i"
+              += explicit
+              += typ "SECONDS"
+              += help "Set the syncing interval in seconds."
+            ]
+        += name "redshift"
+        += help
+               (  "Sync redshift's color temperature to the color temperature "
+               <> "of your lights."
+               )

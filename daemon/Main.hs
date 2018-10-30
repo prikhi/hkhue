@@ -50,6 +50,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 )
 import           HkHue.Types                    ( BridgeState(..)
                                                 , BridgeLight(..)
+                                                , BridgeLightState(..)
                                                 )
 
 import qualified Data.Map.Strict               as Map
@@ -147,27 +148,31 @@ disconnect clientId = modifyState_ $ \s -> return s
 runHue :: HueClient a -> App a
 runHue cmd = readState >>= liftIO . flip runClient cmd . daemonConfig
 
+brideSyncInterval :: Int
+brideSyncInterval = 60 * 1000000
+
 -- | Pull & update the `daemonBridgeState` every 60 seconds.
 bridgeStateSync :: App ()
 bridgeStateSync = handleAny (const bridgeStateSync) . forever $ do
     bridgeState <- runHue getFullBridgeState
     modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
-    liftIO . threadDelay $ 60 * 1000000
+    liftIO $ threadDelay brideSyncInterval
 
 
 -- Client Messages
 
 handleClientMessages :: (ClientId, WS.Connection) -> ClientMsg -> App ()
-handleClientMessages _ = \case
+handleClientMessages (_, conn) = \case
     SetLightState lId lState -> do
         i <- fromLightIdentifier lId
         handlePowerBrightness i lState >>= runHue . setState i
     SetLightName lId lName ->
         fromLightIdentifier lId >>= runHue . flip setName lName
-    SetAllState lState -> everyLightState lState
-    ResetAll           -> runHue resetColors
-    Alert lId          -> fromLightIdentifier lId >>= runHue . alertLight
-    ScanLights         -> runHue searchForLights
+    SetAllState lState  -> everyLightState lState
+    ResetAll            -> runHue resetColors
+    Alert lId           -> fromLightIdentifier lId >>= runHue . alertLight
+    ScanLights          -> runHue searchForLights
+    GetAverageColorTemp -> getAverageColorTemp
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
@@ -178,6 +183,22 @@ handleClientMessages _ = \case
         if any ((/=) lState . snd) newStates
             then forM_ newStates $ \(i, s) -> (runHue $ setState i s)
             else runHue $ setAllState lState
+    getAverageColorTemp = do
+        maybeCurrentTemp <-
+            fmap scaleColorTemp
+            .   (\ts -> sum ts `safeDiv` length ts)
+            .   map snd
+            .   filter ((== "ct") . fst)
+            .   map ((\s -> (blsColorMode s, blsCT s)) . blState)
+            .   Map.elems
+            .   bridgeLights
+            .   daemonBridgeState
+            <$> readState
+        case maybeCurrentTemp of
+            Nothing ->
+                liftIO (threadDelay brideSyncInterval) >> getAverageColorTemp
+            Just ct -> sendDaemonMsg conn $ AverageColorTemp ct
+    n `safeDiv` d = if d == 0 then Nothing else Just $ n `div` d
 
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()

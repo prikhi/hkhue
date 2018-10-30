@@ -28,13 +28,15 @@ data ClientMsg
     | ResetAll
     | Alert { lightId :: LightIdentifier }
     | ScanLights
+    | GetAverageColorTemp
     deriving (Generic, Show)
 
 
 -- Daemon Messages
 
-newtype DaemonMsg
+data DaemonMsg
     = ProtocolError T.Text
+    | AverageColorTemp Int
     deriving (Generic, Show)
 
 
