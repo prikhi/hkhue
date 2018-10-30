@@ -158,7 +158,7 @@ syncRedshift syncInterval conn = forever $ do
     sendClientMsg conn GetAverageColorTemp
     receiveDaemonMsg conn >>= \case
         Just (AverageColorTemp ct) -> do
-            try (readProcess (proc "rdshift" ["-P", "-O", show ct])) >>= \case
+            try (readProcess (proc "redshift" ["-P", "-O", show ct])) >>= \case
                 Right (exitCode, _, stderr) ->
                     when (exitCode /= ExitSuccess) $ L.putStr stderr
                 Left e -> when (ioe_type e == NoSuchThing) $ putStrLn
