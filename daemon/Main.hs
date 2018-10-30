@@ -66,7 +66,7 @@ main = do
     -- make account. That way daemon can start run without manual input.
     -- TODO: Bridge autodiscovery
     bridgeHost <- getArgs >>= \case
-        []    -> putStrLn "Usage: hkhue <bridge-ip>" >> exitFailure
+        []    -> putStrLn "Usage: hkhued <bridge-ip>" >> exitFailure
         b : _ -> return $ T.pack b
     account <- getHueAccount bridgeHost
     let config = HueConfig {hueBridgeHost = bridgeHost, hueAccount = account}
