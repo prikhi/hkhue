@@ -14,6 +14,7 @@ module HkHue.Client
     , setAllState
     , resetColors
     , getFullBridgeState
+    , getFullLightStates
     , scaleColorTemp
     , scaleBrightness
     , unscaleBrightness
@@ -31,6 +32,7 @@ import           Control.Monad.Reader           ( ReaderT
                                                 , liftIO
                                                 )
 import           Data.Aeson                     ( (.=)
+                                                , FromJSON
                                                 , Value
                                                 , object
                                                 )
@@ -47,8 +49,11 @@ import           HkHue.Messages                 ( StateUpdate(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 )
-import           HkHue.Types                    ( BridgeState(..) )
+import           HkHue.Types                    ( BridgeState(..)
+                                                , BridgeLight
+                                                )
 
+import qualified Data.Map.Strict               as Map
 import qualified Data.Text                     as T
 
 -- Config
@@ -158,8 +163,16 @@ resetColors = setAllState StateUpdate
 
 -- | Pull the entire `BridgeState` from the Hue bridge.
 getFullBridgeState :: HueClient BridgeState
-getFullBridgeState = do
-    response <- makeAuthRequest "" >>= liftIO . get
+getFullBridgeState = getPrintAndDecode ""
+
+-- | Pull all `BridgeLight` states from the Hue bridge.
+getFullLightStates :: HueClient (Map.Map Int BridgeLight)
+getFullLightStates = getPrintAndDecode "lights"
+
+-- | Make an authorized GET request, print the response, & decode the body.
+getPrintAndDecode :: FromJSON a => T.Text -> HueClient a
+getPrintAndDecode path = do
+    response <- makeAuthRequest path >>= liftIO . get
     liftIO $ print response
     (^. responseBody) <$> asJSON response
 

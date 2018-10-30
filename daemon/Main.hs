@@ -74,7 +74,9 @@ main = do
         newMVar $ DaemonState config [] (ClientId 1) Map.empty $ BridgeState
             Map.empty
     bridgeSyncThread <- forkIO $ runReaderT bridgeStateSync state
-    flip finally (killThread bridgeSyncThread)
+    lightsSyncThread <- forkIO $ runReaderT lightStateSync state
+    let forkedThreads = [bridgeSyncThread, lightsSyncThread]
+    flip finally (mapM_ killThread forkedThreads)
         $ WS.runServer "0.0.0.0" 9160
         $ application state
 
@@ -151,6 +153,9 @@ runHue cmd = readState >>= liftIO . flip runClient cmd . daemonConfig
 brideSyncInterval :: Int
 brideSyncInterval = 60 * 1000000
 
+lightSyncInterval :: Int
+lightSyncInterval = 5 * 1000000
+
 -- | Pull & update the `daemonBridgeState` every 60 seconds.
 bridgeStateSync :: App ()
 bridgeStateSync = handleAny (const bridgeStateSync) . forever $ do
@@ -158,6 +163,15 @@ bridgeStateSync = handleAny (const bridgeStateSync) . forever $ do
     modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
     liftIO $ threadDelay brideSyncInterval
 
+-- | Pull & update the `bridgeLights` map every 5 seconds.
+lightStateSync :: App ()
+lightStateSync = handleAny (const lightStateSync) . forever $ do
+    lightStates <- runHue getFullLightStates
+    modifyState_ $ \s -> return s
+        { daemonBridgeState = (daemonBridgeState s) { bridgeLights = lightStates
+                                                    }
+        }
+    liftIO $ threadDelay lightSyncInterval
 
 -- Client Messages
 

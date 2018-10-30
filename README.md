@@ -76,8 +76,6 @@ Dunno exactly what I want but probably most of this:
   * Add types for things like PercentBrightness, HueBrightness(1-254),
     ByteChannel(0-255), UnitChannel(0-1), TransitionTime, etc.
 * Management Daemon
-  * Expand heartbeat to pull light state at shorter intervals than full bridge
-    state. Make sure using values as a cache to improve bridge performance.
   * Database for storing color bank, custom effects, scene
   * Manages & cancels long-running effects
 * A GUI for manual control & CLI for scripting
