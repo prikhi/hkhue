@@ -267,7 +267,8 @@ setLight =
                    )
             , enum_
                 lightPower
-                [ atom (Just On) += name "on" += help "Turn light on."
+                [ atom (Nothing :: Maybe LightPower)
+                , atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
             , wait := False += name "wait" += name "w" += explicit += help
@@ -331,7 +332,8 @@ setAll =
                    )
             , enum_
                 lightPower
-                [ atom (Just On) += name "on" += help "Turn light on."
+                [ atom (Nothing :: Maybe LightPower)
+                , atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
             , wait := False += name "wait" += name "w" += explicit += help
