@@ -36,7 +36,6 @@ Dunno exactly what I want but probably most of this:
     like "1s", "30m", "2h"
   * Show errors! "Can't reach bridge", "Can't reach daemon", "Invalid color
     channel value", etc.
-    * On client socket exception, print warning & re-run client mode
   * Refactor DaemonState into separate module(as opaque type?). Ensure all Hue
     API requests update the daemonBridgeState. E.g, so we can set name &
     immediately use it instead of having to wait for bridge sync.

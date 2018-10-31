@@ -44,7 +44,10 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , summary
                                                 )
 import           Text.Read                      ( readMaybe )
-import           System.Exit                    ( ExitCode(ExitSuccess) )
+import           System.Exit                    ( ExitCode(ExitSuccess)
+                                                , exitSuccess
+                                                , exitFailure
+                                                )
 import           System.Process.Typed           ( readProcess
                                                 , proc
                                                 )
@@ -73,10 +76,20 @@ main :: IO ()
 main = do
     clientMode <- cmdArgs_ arguments
     config     <- getConfig
-    withSocketsDo $ WS.runClient (configDaemonAddress config)
-                                 (configDaemonPort config)
-                                 "/"
-                                 (app $ dispatch clientMode)
+    result     <- try . withSocketsDo $ WS.runClient
+        (configDaemonAddress config)
+        (configDaemonPort config)
+        "/"
+        (app $ dispatch clientMode)
+    case result of
+        Left WS.ConnectionClosed ->
+            putStrLn "Lost Connection to Server, Retrying in 5 Seconds."
+                >> threadDelay 5000000
+                >> main
+        Left err ->
+            putStrLn ("Encountered a Connection Error: " <> show err)
+                >> exitFailure
+        Right () -> exitSuccess
 
 
 data ClientConfig
