@@ -40,6 +40,7 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , argPos
                                                 , name
                                                 , explicit
+                                                , ignore
                                                 , typ
                                                 , summary
                                                 )
@@ -280,7 +281,7 @@ setLight =
                    )
             , enum_
                 lightPower
-                [ atom (Nothing :: Maybe LightPower)
+                [ atom (Nothing :: Maybe LightPower) += ignore
                 , atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
@@ -345,7 +346,7 @@ setAll =
                    )
             , enum_
                 lightPower
-                [ atom (Nothing :: Maybe LightPower)
+                [ atom (Nothing :: Maybe LightPower) += ignore
                 , atom (Just On) += name "on" += help "Turn light on."
                 , atom (Just Off) += name "off" += help "Turn light off."
                 ]
