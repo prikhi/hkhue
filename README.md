@@ -27,6 +27,10 @@ Dunno exactly what I want but probably most of this:
     * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
   * Specify multiple lights in `set-light` command
+    * Comma or space separated?
+    * Should we rename `set-light` to `set`, assume all lights if no IDs
+      passed, and remove `set-all` command? Maybe rename `name-light` to
+      `rename`?
   * Dameon Config file
     * Support overriding config options w/ cli flags
   * CLI Config file
@@ -120,6 +124,7 @@ hkhue:exe:hkhue` or `stack install hkhue:exe:hkhued`.
 To see all available commands & flags, run `hkhue --help` or `hkhue <command>
 --help`.
 
+
 ## Configuration
 
 You can modify the default behavior of the daemon & CLI client by creating a
@@ -141,6 +146,84 @@ daemon:
     # Seconds Between Light State Cache Resyncs
     lights-sync-interval: 5
 ```
+
+
+## Examples
+
+### Slowly Ramping Up Color Temperature
+
+This script uses an array of (Color Temperature, Brightness, & Minutes) to
+slowly ramp up the light intensity as you wake up.
+
+```sh
+#!/usr/bin/env bash
+#
+# Gradually brighten & increase color temperature to ease waking up.
+# Starts at pure red & gets to 6500K in ~60 minutes.
+
+echo "[$(date +%T)] Starting wake up sequence."
+
+echo "[$(date +%T)] Turning on red lights at lowest brightness."
+hkhue set-all --on --wait --color 255,0,0 --brightness 1
+
+TEMP_RAMP=(
+  # KELVIN  BRIGHT% MINUTES
+    2000     10      5
+    2500     15      5
+    3000     30      7
+    3500     60      7
+    4250     80     10
+    5000    100     10
+    6500    100     15
+)
+RAMP_LEN=${#TEMP_RAMP[@]}
+
+for (( INDEX=0; INDEX < RAMP_LEN; INDEX=INDEX+3 )); do
+    COLOR_TEMP="${TEMP_RAMP[${INDEX}]}"
+    BRIGHTNESS="${TEMP_RAMP[$((INDEX+1))]}"
+    MINUTES="${TEMP_RAMP[$((INDEX+2))]}"
+    TRANSITION_TIME="$(( 10 * 60 * MINUTES))"
+    hkhue set-all --wait \
+        -k "${COLOR_TEMP}" \
+        -b "${BRIGHTNESS}" \
+        -t "${TRANSITION_TIME}"
+    echo "[$(date +%T)] Reached ${COLOR_TEMP}K and ${BRIGHTNESS}% brightness" \
+         "in ${MINUTES} minute(s)."
+done
+
+echo "[$(date +%T)] Wake up sequence complete."
+```
+
+### Custom Color Loops
+
+This script will loop through whichever RGB colors you like.
+
+```sh
+#!/usr/bin/env bash
+#
+# Loop through the specified RGB colors forever.
+SECONDS=5
+TRANSITION_TIME="$(( 10 * SECONDS ))"
+COLORS=(
+  # RED GRN BLU
+    255   0 255     # Magenta
+      0 255 255     # Cyan
+    255 127   0     # Orange
+      0 255   0     # Green
+)
+COLORS_LEN=${#COLORS[@]}
+while true; do
+    for (( INDEX=0; INDEX < COLORS_LEN; INDEX=INDEX+3 )); do
+        RED="${COLORS[${INDEX}]}"
+        GREEN="${COLORS[$((INDEX+1))]}"
+        BLUE="${COLORS[$((INDEX+2))]}"
+        hkhue set-all --wait \
+            -c "${RED},${GREEN},${BLUE}" \
+            -t "${TRANSITION_TIME}"
+    done
+done
+```
+
 
 ## License
 
