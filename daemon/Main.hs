@@ -75,14 +75,8 @@ main = do
             }
         bridgeInterval = configBridgeSyncInterval config
         lightsInterval = configLightsSyncInterval config
-    state <- newMVar DaemonState
-        { daemonHueConfig        = hueConfig
-        , daemonClients          = []
-        , daemonNextClientId     = ClientId 1
-        , daemonStoredBrightness = Map.empty
-        , daemonBridgeState      = BridgeState Map.empty
-        , daemonCacheInterval    = min bridgeInterval lightsInterval
-        }
+    state <- newMVar
+        $ initialDaemonState hueConfig (min bridgeInterval lightsInterval)
     bridgeSyncThread <- forkIO
         $ runReaderT (bridgeStateSync bridgeInterval) state
     lightsSyncThread <- forkIO
@@ -113,6 +107,16 @@ data DaemonState =
                     , daemonBridgeState :: BridgeState
                     , daemonCacheInterval :: Int
                     }
+
+initialDaemonState :: HueConfig -> Int -> DaemonState
+initialDaemonState hueConfig minSyncInterval = DaemonState
+    { daemonHueConfig        = hueConfig
+    , daemonClients          = []
+    , daemonNextClientId     = ClientId 1
+    , daemonStoredBrightness = Map.empty
+    , daemonBridgeState      = BridgeState Map.empty
+    , daemonCacheInterval    = minSyncInterval
+    }
 
 
 -- Websocket Client Identifiers
