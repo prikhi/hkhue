@@ -38,6 +38,7 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , record
                                                 , def
                                                 , argPos
+                                                , args
                                                 , name
                                                 , explicit
                                                 , ignore
@@ -132,7 +133,7 @@ receiveDaemonMsg = receiveMessage
 -- Command Modes
 
 data ClientMode = SetLight
-                    { light :: String
+                    { lights :: [String]
                     , color :: Maybe RGBColor
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
@@ -140,20 +141,12 @@ data ClientMode = SetLight
                     , lightPower :: Maybe LightPower
                     , wait :: Bool
                     }
-                | SetName
+                | Rename
                     { light :: String
                     , lName :: String
                     }
                 | AlertLight
-                    { light :: String
-                    }
-                | SetAll
-                    { color :: Maybe RGBColor
-                    , brightness :: Maybe Int
-                    , colorTemperature :: Maybe Int
-                    , transitionTime :: Maybe Int
-                    , lightPower :: Maybe LightPower
-                    , wait :: Bool
+                    { lights :: [String]
                     }
                 | Reset
                 | Scan
@@ -170,31 +163,22 @@ parseLight s = case readMaybe s of
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
     SetLight {..} -> \conn -> do
-        setLightState
-            (parseLight light)
-            StateUpdate
+        let lightIds    = map parseLight lights
+            stateUpdate = StateUpdate
                 { suColor            = color
                 , suBrightness       = brightness
                 , suColorTemperature = colorTemperature
                 , suTransitionTime   = transitionTime
                 , suPower            = lightPower
                 }
-            conn
+        if null lightIds
+            then setAllState stateUpdate conn
+            else setLightStates lightIds stateUpdate conn
         delayTransition wait transitionTime
-    SetName {..} ->
+    Rename {..} ->
         (`sendClientMsg` SetLightName (parseLight light) (T.pack lName))
-    AlertLight {..} -> (`sendClientMsg` Alert (parseLight light))
-    SetAll {..}     -> \conn -> do
-        setAllState
-            StateUpdate
-                { suColor            = color
-                , suBrightness       = brightness
-                , suColorTemperature = colorTemperature
-                , suTransitionTime   = transitionTime
-                , suPower            = lightPower
-                }
-            conn
-        delayTransition wait transitionTime
+    AlertLight {..} ->
+        \conn -> sendClientMsg conn . Alert $ map parseLight lights
     Reset         -> (`sendClientMsg` ResetAll)
     Scan          -> (`sendClientMsg` ScanLights)
     Redshift {..} -> syncRedshift interval
@@ -212,9 +196,9 @@ dispatch = \case
 setAllState :: StateUpdate -> WSDispatch
 setAllState stateUpdate conn = sendClientMsg conn $ SetAllState stateUpdate
 
-setLightState :: LightIdentifier -> StateUpdate -> WSDispatch
-setLightState lId stateUpdate conn =
-    sendClientMsg conn $ SetLightState lId stateUpdate
+setLightStates :: [LightIdentifier] -> StateUpdate -> WSDispatch
+setLightStates lightIds stateUpdate conn =
+    mapM_ (sendClientMsg conn . flip SetLightState stateUpdate) lightIds
 
 syncRedshift :: Int -> WSDispatch
 syncRedshift syncInterval conn = forever $ do
@@ -235,17 +219,17 @@ syncRedshift syncInterval conn = forever $ do
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setLight, setName, alert, setAll, reset, scan, redshift]
+    modes_ [setLights, setName, alert, reset, scan, redshift]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
         += summary "hkhue v0.1.0, GPL-3.0"
 
-setLight :: Annotate Ann
-setLight =
+setLights :: Annotate Ann
+setLights =
     record
             (SetLight def def def def def def def)
-            [ light := def += argPos 0 += typ "LIGHT"
+            [ lights := def += args += typ "LIGHT ..."
             , color
             := def
             += name "color"
@@ -288,73 +272,27 @@ setLight =
             , wait := False += name "wait" += name "w" += explicit += help
                 "Wait for transition to complete before exiting."
             ]
-        += name "set-light"
-        += help "Set the state of a specific light."
+        += explicit
+        += name "set"
+        += help "Set the state of the light(s)."
 
 setName :: Annotate Ann
 setName =
     record
-            (SetName def def)
+            (Rename def def)
             [ light := def += argPos 0 += typ "LIGHT"
             , lName := def += argPos 1 += typ "NAME"
             ]
-        += name "set-name"
+        += explicit
+        += name "rename"
         += help "Set the name of a specific light."
 
 alert :: Annotate Ann
 alert =
-    record (AlertLight def) [light := def += argPos 0 += typ "LIGHT"]
+    record (AlertLight def) [lights := def += args += typ "LIGHT ..."]
+        += explicit
         += name "alert"
-        += help "Toggle a specific light, then return to the current state."
-
-setAll :: Annotate Ann
-setAll =
-    record
-            (SetAll def def def def def def)
-            [ color
-            := def
-            += name "color"
-            += name "c"
-            += explicit
-            += typ "RED,GREEN,BLUE"
-            += help "Set the color using values from 0-255."
-            , brightness
-            := def
-            += name "brightness"
-            += name "b"
-            += explicit
-            += typ "INT"
-            += help "Set the brightness using values from 1-254."
-            , colorTemperature
-            := def
-            += name "color-temperature"
-            += name "ct"
-            += name "k"
-            += explicit
-            += typ "INT"
-            += help "Set the color temperature, in Kelvin, from 2000-6500."
-            , transitionTime
-            := def
-            += name "transition-time"
-            += name "t"
-            += explicit
-            += typ "INT"
-            += help
-                   ("Set the transition duration to the new state, in "
-                   <> "100ms, from 0-65535. E.g., `-t 10` will set a transition "
-                   <> "time of 1 second."
-                   )
-            , enum_
-                lightPower
-                [ atom (Nothing :: Maybe LightPower) += ignore
-                , atom (Just On) += name "on" += help "Turn light on."
-                , atom (Just Off) += name "off" += help "Turn light off."
-                ]
-            , wait := False += name "wait" += name "w" += explicit += help
-                "Wait for transition to complete before exiting."
-            ]
-        += name "set-all"
-        += help "Set the state of all lights."
+        += help "Pulse the light(s), then return to the current state."
 
 reset :: Annotate Ann
 reset = record Reset [] += name "reset" += help

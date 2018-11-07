@@ -36,7 +36,7 @@ data ClientMsg
     | SetLightName { lightId :: LightIdentifier, lightName :: T.Text }
     | SetAllState { lightState :: StateUpdate }
     | ResetAll
-    | Alert { lightId :: LightIdentifier }
+    | Alert { lightIds :: [LightIdentifier] }
     | ScanLights
     | GetAverageColorTemp
     deriving (Generic, Show)

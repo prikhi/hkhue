@@ -11,6 +11,7 @@ module HkHue.Client
     , setState
     , setName
     , searchForLights
+    , alertAll
     , setAllState
     , resetColors
     , getFullBridgeState
@@ -139,6 +140,14 @@ searchForLights =
         .   print
 
 -- Groups
+
+alertAll :: HueClient ()
+alertAll =
+    makeAuthRequest "groups/0/action"
+        >>= liftIO
+        .   (`put` object ["alert" .= ("select" :: T.Text)])
+        >>= liftIO
+        .   print
 
 -- | Set the LightState of all connected lights.
 setAllState :: StateUpdate -> HueClient ()

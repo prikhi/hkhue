@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 module Main
@@ -19,7 +20,8 @@ import           Control.Concurrent             ( MVar
 import           Control.Exception.Safe         ( handleAny
                                                 , finally
                                                 )
-import           Control.Monad                  ( unless
+import           Control.Monad                  ( (>=>)
+                                                , unless
                                                 , forever
                                                 , forM_
                                                 )
@@ -195,9 +197,11 @@ handleClientMessages (_, conn) = \case
         handlePowerBrightness i lState >>= runHue . setState i
     SetLightName lId lName ->
         fromLightIdentifier lId >>= runHue . flip setName lName
-    SetAllState lState  -> everyLightState lState
-    ResetAll            -> runHue resetColors
-    Alert lId           -> fromLightIdentifier lId >>= runHue . alertLight
+    SetAllState lState -> everyLightState lState
+    ResetAll           -> runHue resetColors
+    Alert {..}         -> if null lightIds
+        then runHue alertAll
+        else mapM_ (fromLightIdentifier >=> runHue . alertLight) lightIds
     ScanLights          -> runHue searchForLights
     GetAverageColorTemp -> getAverageColorTemp
   where

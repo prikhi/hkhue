@@ -10,7 +10,7 @@ There is a daemon & CLI client, which currently supports:
 * Identifying lights by blinking them on & off.
 * Reseting all the lights to their default color temperature & brightness.
 * Setting the name of a light.
-* Setting the Brightness & Color-Temperature/RGB of a specific light(by name or
+* Setting the Brightness & Color-Temperature/RGB of specific lights(by name or
   number) or all lights - with custom light-state transition times.
 * Scanning for new lights & associating them with the bridge.
 * Syncing the color temperature of your lights to redshift.
@@ -26,11 +26,6 @@ Dunno exactly what I want but probably most of this:
     * Scenes on Hue Bridge or in own database?
     * Play scene but don't change current brightness!
   * Global/Per-Light increments (brightness & color temp)
-  * Specify multiple lights in `set-light` command
-    * Comma or space separated?
-    * Should we rename `set-light` to `set`, assume all lights if no IDs
-      passed, and remove `set-all` command? Maybe rename `name-light` to
-      `rename`?
   * Dameon Config file
     * Support overriding config options w/ cli flags
   * CLI Config file
@@ -107,15 +102,16 @@ Run `stack install` to install the binaries to `~/.local/bin/`:
 ```sh
 stack install
 PATH="~/.local/bin:${PATH}"
-hkhue set-all --on --color-temperature 2500 --brightness 75 --transition-time 300
+hkhue set --on --color-temperature 2500 --brightness 75 --transition-time 300
 hkhue alert 1
-hkhue set-light 1 --color 255,0,255 -b 100 -t 100
+hkhue rename 1 ceiling
+hkhue set ceiling --color 255,0,255 -b 100 -t 100
 hkhue alert 2
-hkhue set-name 2 desk
+hkhue rename 2 desk
 # Sync redshift in the background
 hkhue redshift --interval 20 &
 # Transition to 6000K over 10 minutes
-hkhue set-light desk -k 6000 -t "$((10 * 60 * 10))"
+hkhue set ceiling desk -k 6000 -t "$((10 * 60 * 10))"
 ```
 
 You can install just the daemon or client by running `stack install
@@ -164,7 +160,7 @@ slowly ramp up the light intensity as you wake up.
 echo "[$(date +%T)] Starting wake up sequence."
 
 echo "[$(date +%T)] Turning on red lights at lowest brightness."
-hkhue set-all --on --wait --color 255,0,0 --brightness 1
+hkhue set --on --wait --color 255,0,0 --brightness 1
 
 TEMP_RAMP=(
   # KELVIN  BRIGHT% MINUTES
@@ -183,7 +179,7 @@ for (( INDEX=0; INDEX < RAMP_LEN; INDEX=INDEX+3 )); do
     BRIGHTNESS="${TEMP_RAMP[$((INDEX+1))]}"
     MINUTES="${TEMP_RAMP[$((INDEX+2))]}"
     TRANSITION_TIME="$(( 10 * 60 * MINUTES))"
-    hkhue set-all --wait \
+    hkhue set --wait \
         -k "${COLOR_TEMP}" \
         -b "${BRIGHTNESS}" \
         -t "${TRANSITION_TIME}"
@@ -217,7 +213,7 @@ while true; do
         RED="${COLORS[${INDEX}]}"
         GREEN="${COLORS[$((INDEX+1))]}"
         BLUE="${COLORS[$((INDEX+2))]}"
-        hkhue set-all --wait \
+        hkhue set --wait \
             -c "${RED},${GREEN},${BLUE}" \
             -t "${TRANSITION_TIME}"
     done
