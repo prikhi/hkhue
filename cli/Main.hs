@@ -78,6 +78,8 @@ main :: IO ()
 main = do
     clientMode <- cmdArgs_ arguments
     config     <- getConfig
+    -- TODO: Catch resource vanished from Socket.recvBuf as well
+    --       Also handle Socket.connect failures(e.g., no route to host)
     result     <- try . withSocketsDo $ WS.runClient
         (configDaemonAddress config)
         (configDaemonPort config)

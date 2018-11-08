@@ -8,6 +8,7 @@ module Main
     )
 where
 
+import           Control.Applicative            ( (<|>) )
 import           Control.Concurrent             ( MVar
                                                 , newMVar
                                                 , readMVar
@@ -106,18 +107,20 @@ data DaemonState =
                     , daemonClients :: [(ClientId, WS.Connection)]
                     , daemonNextClientId :: ClientId
                     , daemonStoredBrightness :: Map.Map Int Int
+                    , daemonStoredTemperature :: Map.Map Int Int
                     , daemonBridgeState :: BridgeState
                     , daemonCacheInterval :: Int
                     }
 
 initialDaemonState :: HueConfig -> Int -> DaemonState
 initialDaemonState hueConfig minSyncInterval = DaemonState
-    { daemonHueConfig        = hueConfig
-    , daemonClients          = []
-    , daemonNextClientId     = ClientId 1
-    , daemonStoredBrightness = Map.empty
-    , daemonBridgeState      = BridgeState Map.empty
-    , daemonCacheInterval    = minSyncInterval
+    { daemonHueConfig         = hueConfig
+    , daemonClients           = []
+    , daemonNextClientId      = ClientId 1
+    , daemonStoredBrightness  = Map.empty
+    , daemonStoredTemperature = Map.empty
+    , daemonBridgeState       = BridgeState Map.empty
+    , daemonCacheInterval     = minSyncInterval
     }
 
 
@@ -194,7 +197,10 @@ handleClientMessages :: (ClientId, WS.Connection) -> ClientMsg -> App ()
 handleClientMessages (_, conn) = \case
     SetLightState lId lState -> do
         i <- fromLightIdentifier lId
-        handlePowerBrightness i lState >>= runHue . setState i
+        handlePowerBrightness i lState
+            >>= storeColorTemperature i
+            >>= runHue
+            .   setState i
     SetLightName lId lName ->
         fromLightIdentifier lId >>= runHue . flip setName lName
     SetAllState lState -> everyLightState lState
@@ -203,45 +209,76 @@ handleClientMessages (_, conn) = \case
         then runHue alertAll
         else mapM_ (fromLightIdentifier >=> runHue . alertLight) lightIds
     ScanLights          -> runHue searchForLights
-    GetAverageColorTemp -> getAverageColorTemp
+    GetAverageColorTemp -> getAverageColorTemp conn
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
     everyLightState lState = do
         ids       <- Map.keys . bridgeLights . daemonBridgeState <$> readState
-        newStates <- mapM (\i -> (i, ) <$> handlePowerBrightness i lState) ids
+        newStates <- mapM
+            (\i ->
+                fmap (i, )
+                    $   handlePowerBrightness i lState
+                    >>= storeColorTemperature i
+            )
+            ids
         if any ((/=) lState . snd) newStates
             then forM_ newStates $ \(i, s) -> (runHue $ setState i s)
             else runHue $ setAllState lState
-    getAverageColorTemp = do
-        maybeCurrentTemp <-
-            fmap scaleColorTemp
-            .   (\ts -> sum ts `safeDiv` length ts)
-            .   map snd
-            .   filter ((== "ct") . fst)
-            .   map ((\s -> (blsColorMode s, blsCT s)) . blState)
+
+-- | Determine the average color temperature in Kelvins.
+--
+-- First we try using any powered-on lights that are in Color Temperature
+-- mode. If there are none, we fall back to the temperature values we cache
+-- during state updates. If there are none of those either, we simply wait
+-- until the light state has been re-synced & then try again.
+getAverageColorTemp :: WS.Connection -> App ()
+getAverageColorTemp conn = do
+    maybeCurrentTemp <- averageActiveLightTemperature
+    maybeCachedTemp  <- averageCachedLightTemperature
+    case maybeCurrentTemp <|> maybeCachedTemp of
+        Nothing ->
+            daemonCacheInterval
+                <$> readState
+                >>= liftIO
+                .   threadDelay
+                .   (* 1000000)
+                >>  getAverageColorTemp conn
+        Just ct -> sendDaemonMsg conn $ AverageColorTemp ct
+  where
+    -- Average the color temperature of lights that are turned on and in CT
+    -- mode.
+    averageActiveLightTemperature =
+        fmap scaleColorTemp
+            .   safeAvg
+            .   map (\(_, _, colorTemp) -> colorTemp)
+            .   filter (\(isOn, colorMode, _) -> isOn && colorMode == "ct")
+            .   map ((\s -> (blsOn s, blsColorMode s, blsCT s)) . blState)
             .   Map.elems
             .   bridgeLights
             .   daemonBridgeState
             <$> readState
-        case maybeCurrentTemp of
-            Nothing ->
-                daemonCacheInterval
-                    <$> readState
-                    >>= liftIO
-                    .   threadDelay
-                    >>  getAverageColorTemp
-            Just ct -> sendDaemonMsg conn $ AverageColorTemp ct
-    n `safeDiv` d = if d == 0 then Nothing else Just $ n `div` d
+
+    -- Average the cached color temperatures.
+    averageCachedLightTemperature =
+        safeAvg . Map.elems . daemonStoredTemperature <$> readState
+
+    -- Average a list, returning Nothing if it's empty.
+    safeAvg xs = sum xs `safeDiv` length xs
 
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()
 sendDaemonMsg conn = liftIO . WS.sendTextData conn . encode
 
+-- | Division, returning Nothing for divisors of 0.
+safeDiv :: Integral a => a -> a -> Maybe a
+n `safeDiv` d = if d == 0 then Nothing else Just $ n `div` d
+
 --broadcastDaemonMsg :: MVar DaemonState -> DaemonMsg -> IO ()
 --broadcastDaemonMsg state msg = do
 --    clients <- daemonClients <$> readMVar state
 --    forM_ clients $ \(_, conn) -> sendDaemonMsg conn msg
+
 
 
 -- | When toggling the power off while setting a custom transition time,
@@ -283,6 +320,30 @@ handlePowerBrightness lId update =
                 Map.updateLookupWithKey (\_ _ -> Nothing) lId
                     $ daemonStoredBrightness s
         in  return (s { daemonStoredBrightness = updatedMap }, bri)
+
+
+-- | The `redshift` CLI command mode allows setting your monitor's color
+-- temperature to match your lights using the redshift application. This
+-- sources the color temperature of any lights currently in `ct` mode.
+-- However, nothing will happen if your lights are in the `xy` or `hue/sat`
+-- modes.
+--
+-- To avoid this, we store the color temperature of each light when we set
+-- them. When calculating the average color temperature, we will source our
+-- cached values if no powered-on lights are in `ct` mode.
+--
+-- Note that since xy values in updates will trump any ct values, we ignore
+-- the case where both RGB & Kelvin colors are specified.
+storeColorTemperature :: Int -> StateUpdate -> App StateUpdate
+storeColorTemperature lightId update =
+    case (suColor update, suColorTemperature update) of
+        (Nothing, Just colorTemp) -> do
+            modifyState_ $ \s -> return s
+                { daemonStoredTemperature = Map.insert lightId colorTemp
+                                                $ daemonStoredTemperature s
+                }
+            return update
+        _ -> return update
 
 
 

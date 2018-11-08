@@ -39,6 +39,16 @@ Dunno exactly what I want but probably most of this:
     API requests update the daemonBridgeState. E.g, so we can set name &
     immediately use it instead of having to wait for bridge sync.
   * Clean Up Daemon Output, Support Log File or Verbosity Switches?
+  * Redshift syncing
+    * when making large ct jumps but with long transition times, the bridge
+      will return the final temperature for the first few seconds, then return
+      the actual current color temp. This causes redshift to flash from the
+      current temp to the target color temp and back. We should track when we
+      set the color temp w/ long transitions and modify the color temp we give
+      to the redshift-syncing client so that there is no initial flash. Maybe
+      lock the color temperature from being updated for 5-10 seconds(check how
+      long we need) or simply override the temperature for the average
+      calculations for some period of time.
 * Long/Constant effects
   * Slowly brighten/dim over X number of minutes
     * Currently have a script that slowly increases brightness & color
