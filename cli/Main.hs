@@ -46,6 +46,11 @@ import           System.Console.CmdArgs         ( Annotate(..)
                                                 , summary
                                                 )
 import           Text.Read                      ( readMaybe )
+import           Text.Tabular                   ( Table(..)
+                                                , Header(..)
+                                                , Properties(SingleLine)
+                                                )
+import           Text.Tabular.AsciiArt          ( render )
 import           System.Exit                    ( ExitCode(ExitSuccess)
                                                 , exitSuccess
                                                 , exitFailure
@@ -64,6 +69,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , LightIdentifier(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
+                                                , LightData(..)
                                                 , sendMessage
                                                 , receiveMessage
                                                 )
@@ -155,6 +161,7 @@ data ClientMode = SetLight
                 | Redshift
                     { interval :: Int
                     }
+                | Status
                 deriving (Data, Typeable, Show, Eq)
 
 parseLight :: String -> LightIdentifier
@@ -184,6 +191,7 @@ dispatch = \case
     Reset         -> (`sendClientMsg` ResetAll)
     Scan          -> (`sendClientMsg` ScanLights)
     Redshift {..} -> syncRedshift interval
+    Status        -> printStatus
   where
     delayTransition wait transitionTime =
         when wait . threadDelay $ transitionDelayTime transitionTime
@@ -215,13 +223,40 @@ syncRedshift syncInterval conn = forever $ do
             threadDelay $ syncInterval * 1000000
         x -> putStrLn $ "Received Unexpected Message: " <> show x
 
+printStatus :: WSDispatch
+printStatus conn = do
+    sendClientMsg conn GetLightInfo
+    receiveDaemonMsg conn >>= \case
+        Just (LightInfo info) -> putStrLn . render id id id $ infoToTable info
+        x -> putStrLn $ "Received Unexpected Message: " <> show x
+  where
+    infoToTable info =
+        Table
+                (Group SingleLine $ map (Header . T.unpack . ldName) info)
+                (Group
+                    SingleLine
+                    [ Header "ID"
+                    , Header "Power"
+                    , Header "Color"
+                    , Header "Brightness"
+                    ]
+                )
+            $ map
+                  (\i ->
+                      [ show $ ldId i
+                      , show $ ldPower i
+                      , show $ ldColor i
+                      , show $ ldBrightness i
+                      ]
+                  )
+                  info
 
 
 -- Argument Parsing
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [setLights, setName, alert, reset, scan, redshift]
+    modes_ [status, setLights, setName, alert, reset, scan, redshift]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
@@ -337,3 +372,7 @@ redshift =
                <> "bound of the `--interval` flag to the daemon's refresh "
                <> "interval."
                ]
+
+status :: Annotate Ann
+status = record Status [] += name "status" += help
+    "Print the current status of the lights."

@@ -56,6 +56,8 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , StateUpdate(..)
                                                 , LightPower(..)
                                                 , LightIdentifier(..)
+                                                , LightData(..)
+                                                , LightColor(..)
                                                 )
 import           HkHue.Types                    ( BridgeState(..)
                                                 , BridgeLight(..)
@@ -210,6 +212,7 @@ handleClientMessages (_, conn) = \case
         else mapM_ (fromLightIdentifier >=> runHue . alertLight) lightIds
     ScanLights          -> runHue searchForLights
     GetAverageColorTemp -> getAverageColorTemp conn
+    GetLightInfo        -> getLightInfo conn
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
@@ -265,6 +268,31 @@ getAverageColorTemp conn = do
 
     -- Average a list, returning Nothing if it's empty.
     safeAvg xs = sum xs `safeDiv` length xs
+
+-- | Send data for every light to the client.
+getLightInfo :: WS.Connection -> App ()
+getLightInfo conn =
+    map buildLightData
+        .   Map.assocs
+        .   bridgeLights
+        .   daemonBridgeState
+        <$> readState
+        >>= sendDaemonMsg conn
+        .   LightInfo
+  where
+    buildLightData :: (Int, BridgeLight) -> LightData
+    buildLightData (ident, light) =
+        let state = blState light
+            color = case blsColorMode state of
+                "xy" -> RGBMode $ uncurry toRGB (blsXY state)
+                _    -> CTMode . scaleColorTemp $ blsCT state
+        in  LightData
+                { ldId         = ident
+                , ldName       = blName light
+                , ldPower      = if blsOn state then On else Off
+                , ldColor      = color
+                , ldBrightness = unscaleBrightness $ blsBrightness state
+                }
 
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()

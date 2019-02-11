@@ -7,6 +7,8 @@ module HkHue.Messages
     , RGBColor(..)
     , LightPower(..)
     , StateUpdate(..)
+    , LightData(..)
+    , LightColor(..)
     , sendMessage
     , receiveMessage
     )
@@ -39,6 +41,7 @@ data ClientMsg
     | Alert { lightIds :: [LightIdentifier] }
     | ScanLights
     | GetAverageColorTemp
+    | GetLightInfo
     deriving (Generic, Show)
 
 
@@ -47,6 +50,7 @@ data ClientMsg
 data DaemonMsg
     = ProtocolError T.Text
     | AverageColorTemp Int
+    | LightInfo [LightData]
     deriving (Generic, Show)
 
 -- Message Helpers
@@ -90,6 +94,28 @@ data StateUpdate
         } deriving (Data, Typeable, Generic, Show, Eq)
 
 
+data LightData
+    = LightData
+        { ldId :: Int
+        , ldName :: T.Text
+        , ldPower :: LightPower
+        , ldColor :: LightColor
+        , ldBrightness :: Int
+        } deriving (Data, Typeable, Generic, Show, Eq)
+
+data LightColor
+    = RGBMode RGBColor
+    | CTMode Int
+    deriving (Data, Typeable, Generic, Eq)
+
+instance Show LightColor where
+    show (RGBMode (RGBColor r g b)) =
+        concat [ "(", show r, ", " , show g,  ", " , show b , ")" ]
+    show (CTMode i) =
+        show i <> "K"
+
+
+
 -- Aeson Classes
 
 instance FromJSON ClientMsg
@@ -110,4 +136,11 @@ instance ToJSON LightPower where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON StateUpdate
 instance ToJSON StateUpdate where
+    toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON LightData
+instance ToJSON LightData where
+    toEncoding = genericToEncoding defaultOptions
+instance FromJSON LightColor
+instance ToJSON LightColor where
     toEncoding = genericToEncoding defaultOptions

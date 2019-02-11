@@ -7,6 +7,7 @@ A Haskell library & application for controlling Philips Hue lights.
 
 There is a daemon & CLI client, which currently supports:
 
+* Showing the current status of each light(name, on/off, color, brightness).
 * Identifying lights by blinking them on & off.
 * Reseting all the lights to their default color temperature & brightness.
 * Setting the name of a light.
@@ -21,7 +22,8 @@ There is a daemon & CLI client, which currently supports:
 Dunno exactly what I want but probably most of this:
 
 * Basic usage
-  * Query light status - id, name, on/off, color, brightness
+  * Query light status
+    * Improve the XY -> RGB conversion - sometimes the values are negative...
   * Create/run preset scenes
     * Scenes on Hue Bridge or in own database?
     * Play scene but don't change current brightness!

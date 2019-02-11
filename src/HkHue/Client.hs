@@ -21,6 +21,7 @@ module HkHue.Client
     , unscaleBrightness
     , scaleChannel
     , toXY
+    , toRGB
     )
 where
 
@@ -205,6 +206,8 @@ scaleChannel :: Int -> Rational
 scaleChannel c = toRational c / 255
 
 -- | Convert RGB values from 0-1 into CIE XY values.
+-- See:
+-- https://developers.meethue.com/documentation/color-conversions-rgb-xy
 toXY :: Rational -> Rational -> Rational -> (Double, Double)
 toXY r g b =
     let red   = gammaCorrect r
@@ -220,6 +223,34 @@ toXY r g b =
     gammaCorrect c = if c > (4045 % 100000 :: Rational)
         then realToFrac ((c + (55 % 1000)) / (1 + (55 % 1000))) ** 2.4
         else fromRational $ c / (1292 % 100)
+
+-- | Convert CIE XY values to RGB values.
+-- See:
+-- https://developers.meethue.com/documentation/color-conversions-rgb-xy
+toRGB :: Rational -> Rational -> RGBColor
+toRGB x' y' =
+    let z' = 1.0 - x' - y'
+        y  = 1.0
+        x  = y / y' * x'
+        z  = y / y' * z'
+        r  = x * 1.656492 - y * 0.354851 - z * 0.255038
+        g  = x * (-0.707196) + y * 1.655397 + z * 0.036152
+        b  = x * 0.051713 - y * 0.121364 + z * 1.011530
+        (red, green, blue) =
+            map3 (round . (* 255)) $ map3 reverseGamma $ toUnitRGB r g b
+    in  RGBColor red green blue
+  where
+    --gammaAndScale c = round $ 255 * c
+    map3 f (a, b, c) = (f a, f b, f c)
+    toUnitRGB r g b | r > b && r > g && r > 1 = (1, g / r, b / r)
+                    | g > b && g > r && g > 1 = (r / g, 1, b / g)
+                    | b > g && b > r && b > 1 = (r / b, g / b, 1)
+                    | otherwise               = (r, g, b)
+    reverseGamma :: Rational -> Rational
+    reverseGamma c = if c <= 0.0031308
+        then 12.92 * c
+        else 1.055 * toRational (realToFrac c ** (1 / 2.4) :: Double) - 0.055
+
 
 
 -- Request Utils
