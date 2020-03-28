@@ -150,18 +150,18 @@ fromLightIdentifier = \case
 
 -- | Handle a WS request, storing the Client ID & Connection.
 application :: MVar DaemonState -> WS.ServerApp
-application state pending = flip runReaderT state $ do
-    conn <- liftIO $ WS.acceptRequest pending
-    liftIO $ WS.forkPingThread conn 30
-    clientId <- nextClientId
-    let client = (clientId, conn)
-    flip finally (disconnect clientId) $ do
-        modifyState_
-            $ \s -> return s { daemonClients = client : daemonClients s }
-        forever $ eitherDecode' <$> liftIO (WS.receiveData conn) >>= \case
-            Left errorString ->
-                sendDaemonMsg conn . ProtocolError $ T.pack errorString
-            Right msg -> handleClientMessages client msg
+application state pending = do
+    conn <- WS.acceptRequest pending
+    WS.withPingThread conn 30 (return ()) . flip runReaderT state $ do
+        clientId <- nextClientId
+        let client = (clientId, conn)
+        flip finally (disconnect clientId) $ do
+            modifyState_ $ \s ->
+                return s { daemonClients = client : daemonClients s }
+            forever $ eitherDecode' <$> liftIO (WS.receiveData conn) >>= \case
+                Left errorString ->
+                    sendDaemonMsg conn . ProtocolError $ T.pack errorString
+                Right msg -> handleClientMessages client msg
 
 -- | Remove the client from the client list
 disconnect :: ClientId -> App ()
