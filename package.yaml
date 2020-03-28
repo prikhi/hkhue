@@ -78,6 +78,13 @@ executables:
     - system-fileio
     - system-filepath
     - xdg-basedir
+  wakeup:
+    main:               Wakeup.hs
+    source-dirs:        examples/wakeup
+    dependencies:
+    - hkhue
+    - network
+    - time
 
 tests:
   hkhue-test:

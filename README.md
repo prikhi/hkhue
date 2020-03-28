@@ -161,7 +161,8 @@ daemon:
 ### Slowly Ramping Up Color Temperature
 
 This script uses an array of (Color Temperature, Brightness, & Minutes) to
-slowly ramp up the light intensity as you wake up.
+slowly ramp up the light intensity as you wake up. See the `/examples/wakeup/`
+folder for a Haskell implementation.
 
 ```sh
 #!/usr/bin/env bash
