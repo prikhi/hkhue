@@ -25,6 +25,7 @@ import           Data.Aeson                     ( FromJSON
                                                 , defaultOptions
                                                 )
 import           Data.Data                      ( Data )
+import           Data.Default                   ( Default(..) )
 import           Data.Typeable                  ( Typeable )
 import           GHC.Generics
 
@@ -92,6 +93,9 @@ data StateUpdate
         , suTransitionTime :: Maybe Int
         , suPower :: Maybe LightPower
         } deriving (Data, Typeable, Generic, Show, Eq)
+
+instance Default StateUpdate where
+    def = StateUpdate Nothing Nothing Nothing Nothing Nothing
 
 
 data LightData
