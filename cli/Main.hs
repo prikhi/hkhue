@@ -13,10 +13,6 @@ import           Control.Exception.Safe         ( try )
 import           Control.Monad                  ( forever
                                                 , when
                                                 )
-import           Data.Aeson                     ( (.:)
-                                                , FromJSON(parseJSON)
-                                                , withObject
-                                                )
 import           Data.Data                      ( Data )
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Typeable                  ( Typeable )
@@ -59,9 +55,8 @@ import           System.Process.Typed           ( readProcess
                                                 , proc
                                                 )
 
-import           HkHue.Config                   ( getConfig
-                                                , defaultBindAddress
-                                                , defaultBindPort
+import           HkHue.Config                   ( ClientConfig(..)
+                                                , getConfig
                                                 )
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
@@ -75,7 +70,6 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 )
 
 import qualified Data.ByteString.Lazy          as L
-import qualified Data.Default                  as Def
 import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
 
@@ -100,26 +94,6 @@ main = do
             putStrLn ("Encountered a Connection Error: " <> show err)
                 >> exitFailure
         Right () -> exitSuccess
-
-
-data ClientConfig
-    = ClientConfig
-        { configDaemonAddress :: String
-        , configDaemonPort :: Int
-        }
-
-instance FromJSON ClientConfig where
-    parseJSON = withObject "ClientConfig" $ \o ->
-        ClientConfig
-            <$> o .: "bind-address"
-            <*> o .: "bind-port"
-
-instance Def.Default ClientConfig where
-    def =
-        ClientConfig
-            { configDaemonAddress = defaultBindAddress
-            , configDaemonPort = defaultBindPort
-            }
 
 
 -- WebSockets
