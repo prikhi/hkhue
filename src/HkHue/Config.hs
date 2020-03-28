@@ -55,14 +55,10 @@ data ClientConfig
         }
 
 instance FromJSON ClientConfig where
-    parseJSON = withObject "ClientConfig" $ \o ->
-        ClientConfig
-            <$> o .: "bind-address"
-            <*> o .: "bind-port"
+    parseJSON = withObject "ClientConfig"
+        $ \o -> ClientConfig <$> o .: "bind-address" <*> o .: "bind-port"
 
 instance Default ClientConfig where
-    def =
-        ClientConfig
-            { configDaemonAddress = defaultBindAddress
-            , configDaemonPort = defaultBindPort
-            }
+    def = ClientConfig { configDaemonAddress = defaultBindAddress
+                       , configDaemonPort    = defaultBindPort
+                       }

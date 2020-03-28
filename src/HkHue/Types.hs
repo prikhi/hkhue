@@ -24,8 +24,7 @@ newtype BridgeState =
         } deriving (Show)
 
 instance FromJSON BridgeState where
-    parseJSON = withObject "BridgeState" $ \o ->
-        BridgeState <$> o .: "lights"
+    parseJSON = withObject "BridgeState" $ \o -> BridgeState <$> o .: "lights"
 
 data BridgeLight =
     BridgeLight
@@ -39,11 +38,11 @@ data BridgeLight =
 instance FromJSON BridgeLight where
     parseJSON = withObject "BridgeLight" $ \o ->
         BridgeLight
-            <$> o .: "state"
-            <*> o.: "type"
-            <*> o .: "name"
-            <*> o .: "modelid"
-            <*> o .: "swversion"
+            <$> (o .: "state")
+            <*> (o .: "type")
+            <*> (o .: "name")
+            <*> (o .: "modelid")
+            <*> (o .: "swversion")
 
 data BridgeLightState =
     BridgeLightState
@@ -62,13 +61,19 @@ data BridgeLightState =
 instance FromJSON BridgeLightState where
     parseJSON = withObject "BridgeLightState" $ \o ->
         BridgeLightState
-            <$> o .: "on"
-            <*> o .: "bri"
-            <*> o .: "hue"
-            <*> o .: "sat"
-            <*> ((\(x, y) -> (toRational (x :: Scientific), toRational (y :: Scientific))) <$> o .: "xy")
-            <*> o .: "ct"
-            <*> o .: "alert"
-            <*> o .: "effect"
-            <*> o .: "colormode"
-            <*> o .: "reachable"
+            <$> (o .: "on")
+            <*> (o .: "bri")
+            <*> (o .: "hue")
+            <*> (o .: "sat")
+            <*> (   (\(x, y) ->
+                        ( toRational (x :: Scientific)
+                        , toRational (y :: Scientific)
+                        )
+                    )
+                <$> (o .: "xy")
+                )
+            <*> (o .: "ct")
+            <*> (o .: "alert")
+            <*> (o .: "effect")
+            <*> (o .: "colormode")
+            <*> (o .: "reachable")

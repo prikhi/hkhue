@@ -147,13 +147,12 @@ dispatch :: ClientMode -> WSDispatch
 dispatch = \case
     SetLight {..} -> \conn -> do
         let lightIds    = map parseLight lights
-            stateUpdate = StateUpdate
-                { suColor            = color
-                , suBrightness       = brightness
-                , suColorTemperature = colorTemperature
-                , suTransitionTime   = transitionTime
-                , suPower            = lightPower
-                }
+            stateUpdate = StateUpdate { suColor            = color
+                                      , suBrightness       = brightness
+                                      , suColorTemperature = colorTemperature
+                                      , suTransitionTime   = transitionTime
+                                      , suPower            = lightPower
+                                      }
         if null lightIds
             then setAllState stateUpdate conn
             else setLightStates lightIds stateUpdate conn

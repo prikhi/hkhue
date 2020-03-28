@@ -161,13 +161,12 @@ setAllState stateUpdate = do
 
 -- | Switch all lights back to their factory default color
 resetColors :: HueClient ()
-resetColors = setAllState StateUpdate
-    { suColor            = Nothing
-    , suBrightness       = Just 100
-    , suColorTemperature = Just 2732
-    , suTransitionTime   = Nothing
-    , suPower            = Just On
-    }
+resetColors = setAllState StateUpdate { suColor            = Nothing
+                                      , suBrightness       = Just 100
+                                      , suColorTemperature = Just 2732
+                                      , suTransitionTime   = Nothing
+                                      , suPower            = Just On
+                                      }
 
 -- Configuration
 
@@ -237,7 +236,7 @@ toRGB x' y' =
         g  = x * (-0.707196) + y * 1.655397 + z * 0.036152
         b  = x * 0.051713 - y * 0.121364 + z * 1.011530
         (red, green, blue) =
-            map3 (round . (* 255)) $ map3 reverseGamma $ toUnitRGB r g b
+                map3 (round . (* 255)) $ map3 reverseGamma $ toUnitRGB r g b
     in  RGBColor red green blue
   where
     --gammaAndScale c = round $ 255 * c

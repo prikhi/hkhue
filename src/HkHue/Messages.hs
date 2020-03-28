@@ -114,9 +114,8 @@ data LightColor
 
 instance Show LightColor where
     show (RGBMode (RGBColor r g b)) =
-        concat [ "(", show r, ", " , show g,  ", " , show b , ")" ]
-    show (CTMode i) =
-        show i <> "K"
+        concat ["(", show r, ", ", show g, ", ", show b, ")"]
+    show (CTMode i) = show i <> "K"
 
 
 

@@ -74,10 +74,9 @@ main :: IO ()
 main = do
     config  <- getConfig
     account <- getHueAccount $ configBridgeHost config
-    let hueConfig = HueConfig
-            { hueBridgeHost = configBridgeHost config
-            , hueAccount    = account
-            }
+    let hueConfig = HueConfig { hueBridgeHost = configBridgeHost config
+                              , hueAccount    = account
+                              }
         bridgeInterval = configBridgeSyncInterval config
         lightsInterval = configLightsSyncInterval config
     state <- newMVar
@@ -188,8 +187,9 @@ lightStateSync syncInterval =
     handleAny (const $ lightStateSync syncInterval) . forever $ do
         lightStates <- runHue getFullLightStates
         modifyState_ $ \s -> return s
-            { daemonBridgeState =
-                (daemonBridgeState s) { bridgeLights = lightStates }
+            { daemonBridgeState = (daemonBridgeState s)
+                { bridgeLights = lightStates
+                }
             }
         liftIO . threadDelay $ syncInterval * 1000000
 
@@ -226,7 +226,7 @@ handleClientMessages (_, conn) = \case
             )
             ids
         if any ((/=) lState . snd) newStates
-            then forM_ newStates $ \(i, s) -> (runHue $ setState i s)
+            then forM_ newStates $ \(i, s) -> runHue $ setState i s
             else runHue $ setAllState lState
 
 -- | Determine the average color temperature in Kelvins.
@@ -286,13 +286,12 @@ getLightInfo conn =
             color = case blsColorMode state of
                 "xy" -> RGBMode $ uncurry toRGB (blsXY state)
                 _    -> CTMode . scaleColorTemp $ blsCT state
-        in  LightData
-                { ldId         = ident
-                , ldName       = blName light
-                , ldPower      = if blsOn state then On else Off
-                , ldColor      = color
-                , ldBrightness = unscaleBrightness $ blsBrightness state
-                }
+        in  LightData { ldId         = ident
+                      , ldName       = blName light
+                      , ldPower      = if blsOn state then On else Off
+                      , ldColor      = color
+                      , ldBrightness = unscaleBrightness $ blsBrightness state
+                      }
 
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()
@@ -345,8 +344,8 @@ handlePowerBrightness lId update =
         }
     getAndDeleteBrightness = modifyState $ \s ->
         let (bri, updatedMap) =
-                Map.updateLookupWithKey (\_ _ -> Nothing) lId
-                    $ daemonStoredBrightness s
+                    Map.updateLookupWithKey (\_ _ -> Nothing) lId
+                        $ daemonStoredBrightness s
         in  return (s { daemonStoredBrightness = updatedMap }, bri)
 
 
@@ -387,24 +386,22 @@ data DaemonConfig =
                  }
 
 instance Default DaemonConfig where
-    def =
-        DaemonConfig
-            { configBridgeHost= "philips-hue"
-            , configBindHost = defaultBindAddress
-            , configBindPort = defaultBindPort
-            , configBridgeSyncInterval = 60
-            , configLightsSyncInterval = 5
-            }
+    def = DaemonConfig { configBridgeHost         = "philips-hue"
+                       , configBindHost           = defaultBindAddress
+                       , configBindPort           = defaultBindPort
+                       , configBridgeSyncInterval = 60
+                       , configLightsSyncInterval = 5
+                       }
 
 instance FromJSON DaemonConfig where
     parseJSON = withObject "DaemonConfig" $ \o -> do
         daemonYaml <- o .: "daemon"
         DaemonConfig
-            <$> daemonYaml .: "bridge-host"
-            <*> o .: "bind-address"
-            <*> o .: "bind-port"
-            <*> daemonYaml .: "bridge-sync-interval"
-            <*> daemonYaml .: "lights-sync-interval"
+            <$> (daemonYaml .: "bridge-host")
+            <*> (o .: "bind-address")
+            <*> (o .: "bind-port")
+            <*> (daemonYaml .: "bridge-sync-interval")
+            <*> (daemonYaml .: "lights-sync-interval")
 
 
 -- Account Creation
