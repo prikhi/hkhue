@@ -1,5 +1,7 @@
 # hkhue
 
+[![HkHue Build Status](https://travis-ci.org/prikhi/hkhue.svg?branch=master)](https://travis-ci.org/prikhi/hkhue)
+
 A Haskell library & application for controlling Philips Hue lights.
 
 
