@@ -10,11 +10,13 @@ A Haskell library & application for controlling Philips Hue lights.
 There is a daemon & CLI client, which currently supports:
 
 * Showing the current status of each light(name, on/off, color, brightness).
+* Showing the current status of each group.
 * Identifying lights by blinking them on & off.
 * Reseting all the lights to their default color temperature & brightness.
 * Setting the name of a light.
 * Setting the Brightness & Color-Temperature/RGB of specific lights(by name or
-  number) or all lights - with custom light-state transition times.
+  number), a group of lights(by name or number), or all lights - with custom
+  light-state transition times.
 * Scanning for new lights & associating them with the bridge.
 * Syncing the color temperature of your lights to redshift.
 
