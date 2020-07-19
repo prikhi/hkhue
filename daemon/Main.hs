@@ -26,6 +26,7 @@ import           Control.Monad                  ( (>=>)
                                                 , unless
                                                 , forever
                                                 , forM_
+                                                , forM
                                                 )
 import           Control.Monad.Reader           ( ReaderT
                                                 , runReaderT
@@ -60,6 +61,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , LightIdentifier(..)
                                                 , LightData(..)
                                                 , LightColor(..)
+                                                , GroupIdentifier(..)
                                                 , GroupData(..)
                                                 )
 import           HkHue.Types                    ( BridgeState(..)
@@ -153,6 +155,21 @@ fromLightIdentifier = \case
         Just x  -> Just x
         Nothing -> if blName lightData == n then Just i else Nothing
 
+-- | Convert a `GroupIdentifier` into the bridge's Group ID using the
+-- BridgeState to convert from Names to IDs.
+fromGroupIdentifier :: GroupIdentifier -> App Int
+fromGroupIdentifier = \case
+    GroupId   i -> return i
+    GroupName n -> do
+        groups <- bridgeGroups . daemonBridgeState <$> readState
+        case Map.foldrWithKey (findName n) Nothing groups of
+            Just i  -> return i
+            Nothing -> return 0
+  where
+    findName n i groupData = \case
+        Just x  -> Just x
+        Nothing -> if bgName groupData == n then Just i else Nothing
+
 -- | Handle a WS request, storing the Client ID & Connection.
 application :: MVar DaemonState -> WS.ServerApp
 application state pending = do
@@ -210,9 +227,12 @@ handleClientMessages (_, conn) = \case
             .   setState i
     SetLightName lId lName ->
         fromLightIdentifier lId >>= runHue . flip setName lName
-    SetAllState lState -> everyLightState lState
-    ResetAll           -> runHue resetColors
-    Alert {..}         -> if null lightIds
+    SetAllState lState       -> everyLightState lState
+    SetGroupState gId lState -> do
+        i <- fromGroupIdentifier gId
+        everyLightInGroupState i lState
+    ResetAll   -> runHue resetColors
+    Alert {..} -> if null lightIds
         then runHue alertAll
         else mapM_ (fromLightIdentifier >=> runHue . alertLight) lightIds
     ScanLights          -> runHue searchForLights
@@ -234,6 +254,26 @@ handleClientMessages (_, conn) = \case
         if any ((/=) lState . snd) newStates
             then forM_ newStates $ \(i, s) -> runHue $ setState i s
             else runHue $ setAllState lState
+
+    -- | Send an update to every light in a group at once, unless
+    -- a brightness adjustment is necessary.
+    everyLightInGroupState gId lState = do
+        mBridgeGroup <-
+            lookup gId
+            .   Map.assocs
+            .   bridgeGroups
+            .   daemonBridgeState
+            <$> readState
+        forM_ mBridgeGroup $ \bg -> do
+            newStates <-
+                forM (bgLights bg)
+                    $ \i ->
+                          fmap (i, )
+                              $   handlePowerBrightness i lState
+                              >>= storeColorTemperature i
+            if any ((/=) lState . snd) newStates
+                then forM_ newStates $ (\(i, s) -> runHue $ setState i s)
+                else runHue $ setGroupState gId lState
 
 -- | Determine the average color temperature in Kelvins.
 --

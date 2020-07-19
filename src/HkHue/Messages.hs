@@ -9,6 +9,7 @@ module HkHue.Messages
     , StateUpdate(..)
     , LightData(..)
     , LightColor(..)
+    , GroupIdentifier(..)
     , GroupData(..)
     , sendMessage
     , receiveMessage
@@ -39,6 +40,7 @@ data ClientMsg
     = SetLightState { lightId :: LightIdentifier, lightState :: StateUpdate }
     | SetLightName { lightId :: LightIdentifier, lightName :: T.Text }
     | SetAllState { lightState :: StateUpdate }
+    | SetGroupState { groupId :: GroupIdentifier, lightState :: StateUpdate }
     | ResetAll
     | Alert { lightIds :: [LightIdentifier] }
     | ScanLights
@@ -121,6 +123,11 @@ instance Show LightColor where
     show (CTMode i) = show i <> "K"
 
 
+data GroupIdentifier
+    = GroupId Int
+    | GroupName T.Text
+    deriving (Data, Typeable, Generic, Show, Eq)
+
 data GroupData
     = GroupData
         { gdId :: Int
@@ -162,6 +169,9 @@ instance FromJSON LightColor
 instance ToJSON LightColor where
     toEncoding = genericToEncoding defaultOptions
 
+instance FromJSON GroupIdentifier
+instance ToJSON GroupIdentifier where
+    toEncoding = genericToEncoding defaultOptions
 instance FromJSON GroupData
 instance ToJSON GroupData where
     toEncoding = genericToEncoding defaultOptions
