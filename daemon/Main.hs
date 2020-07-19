@@ -9,6 +9,7 @@ module Main
 where
 
 import           Control.Applicative            ( (<|>) )
+import           Control.Arrow                  ( (&&&) )
 import           Control.Concurrent             ( MVar
                                                 , newMVar
                                                 , readMVar
@@ -37,6 +38,7 @@ import           Data.Aeson                     ( (.:)
                                                 , eitherDecode'
                                                 , withObject
                                                 )
+import           Data.Bifunctor                 ( bimap )
 import           Data.Default                   ( Default(..) )
 import           Filesystem                     ( isFile
                                                 , createTree
@@ -58,10 +60,13 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , LightIdentifier(..)
                                                 , LightData(..)
                                                 , LightColor(..)
+                                                , GroupData(..)
                                                 )
 import           HkHue.Types                    ( BridgeState(..)
                                                 , BridgeLight(..)
                                                 , BridgeLightState(..)
+                                                , BridgeGroup(..)
+                                                , BridgeGroupState(..)
                                                 )
 
 import qualified Data.Map.Strict               as Map
@@ -213,6 +218,7 @@ handleClientMessages (_, conn) = \case
     ScanLights          -> runHue searchForLights
     GetAverageColorTemp -> getAverageColorTemp conn
     GetLightInfo        -> getLightInfo conn
+    GetGroupInfo        -> getGroupInfo conn
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
@@ -292,6 +298,38 @@ getLightInfo conn =
                       , ldColor      = color
                       , ldBrightness = unscaleBrightness $ blsBrightness state
                       }
+
+-- | Send data for every group to the client.
+getGroupInfo :: WS.Connection -> App ()
+getGroupInfo conn =
+    (\(lights, groups) -> map (buildGroupData lights) groups)
+        .   bimap Map.assocs Map.assocs
+        .   (bridgeLights &&& bridgeGroups)
+        .   daemonBridgeState
+        <$> readState
+        >>= sendDaemonMsg conn
+        .   GroupInfo
+  where
+    buildGroupData :: [(Int, BridgeLight)] -> (Int, BridgeGroup) -> GroupData
+    buildGroupData lights (ident, group) =
+        let
+            state = bgState group
+            color = case bgsColorMode state of
+                "xy" -> RGBMode $ uncurry toRGB (bgsXY state)
+                _    -> CTMode . scaleColorTemp $ bgsCT state
+        in
+            GroupData
+                { gdId         = ident
+                , gdName       = bgName group
+                , gdLights     = (\lightId -> (lightId, findLightName lightId))
+                                     <$> bgLights group
+                , gdPower      = if bgsOn state then On else Off
+                , gdColor      = color
+                , gdBrightness = unscaleBrightness $ bgsBrightness state
+                }
+      where
+        findLightName :: Int -> T.Text
+        findLightName lightId = maybe "" blName $ lookup lightId lights
 
 
 sendDaemonMsg :: WS.Connection -> DaemonMsg -> App ()

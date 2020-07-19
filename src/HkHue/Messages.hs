@@ -9,6 +9,7 @@ module HkHue.Messages
     , StateUpdate(..)
     , LightData(..)
     , LightColor(..)
+    , GroupData(..)
     , sendMessage
     , receiveMessage
     )
@@ -43,6 +44,7 @@ data ClientMsg
     | ScanLights
     | GetAverageColorTemp
     | GetLightInfo
+    | GetGroupInfo
     deriving (Generic, Show)
 
 
@@ -52,6 +54,7 @@ data DaemonMsg
     = ProtocolError T.Text
     | AverageColorTemp Int
     | LightInfo [LightData]
+    | GroupInfo [GroupData]
     deriving (Generic, Show)
 
 -- Message Helpers
@@ -118,6 +121,17 @@ instance Show LightColor where
     show (CTMode i) = show i <> "K"
 
 
+data GroupData
+    = GroupData
+        { gdId :: Int
+        , gdName :: T.Text
+        , gdLights :: [(Int, T.Text)]
+        , gdPower :: LightPower
+        , gdColor :: LightColor
+        , gdBrightness :: Int
+        } deriving (Data, Typeable, Generic, Show, Eq)
+
+
 
 -- Aeson Classes
 
@@ -146,4 +160,8 @@ instance ToJSON LightData where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON LightColor
 instance ToJSON LightColor where
+    toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON GroupData
+instance ToJSON GroupData where
     toEncoding = genericToEncoding defaultOptions

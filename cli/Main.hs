@@ -14,6 +14,7 @@ import           Control.Monad                  ( forever
                                                 , when
                                                 )
 import           Data.Data                      ( Data )
+import           Data.List                      ( intercalate )
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Typeable                  ( Typeable )
 import           GHC.IO.Exception               ( IOException(ioe_type)
@@ -65,6 +66,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 , LightData(..)
+                                                , GroupData(..)
                                                 , sendMessage
                                                 , receiveMessage
                                                 )
@@ -136,6 +138,7 @@ data ClientMode = SetLight
                     { interval :: Int
                     }
                 | Status
+                | GroupStatus
                 deriving (Data, Typeable, Show, Eq)
 
 parseLight :: String -> LightIdentifier
@@ -165,6 +168,7 @@ dispatch = \case
     Scan          -> (`sendClientMsg` ScanLights)
     Redshift {..} -> syncRedshift interval
     Status        -> printStatus
+    GroupStatus   -> printGroupStatus
   where
     delayTransition wait transitionTime =
         when wait . threadDelay $ transitionDelayTime transitionTime
@@ -224,12 +228,53 @@ printStatus conn = do
                   )
                   info
 
+printGroupStatus :: WSDispatch
+printGroupStatus conn = do
+    sendClientMsg conn GetGroupInfo
+    receiveDaemonMsg conn >>= \case
+        Just (GroupInfo info) -> putStrLn . render id id id $ infoToTable info
+        x -> putStrLn $ "Received Unexpected Message: " <> show x
+  where
+    infoToTable info =
+        Table
+                (Group SingleLine $ map (Header . T.unpack . gdName) info)
+                (Group
+                    SingleLine
+                    [ Header "ID"
+                    , Header "Lights"
+                    , Header "Power"
+                    , Header "Color"
+                    , Header "Brightness"
+                    ]
+                )
+            $ map
+                  (\i ->
+                      [ show $ gdId i
+                      , intercalate ", " $ map showLight $ gdLights i
+                      , show $ gdPower i
+                      , show $ gdColor i
+                      , show $ gdBrightness i
+                      ]
+                  )
+                  info
+    showLight :: (Int, T.Text) -> String
+    showLight (lId, lName) = if T.null lName then show lId else T.unpack lName
+
 
 -- Argument Parsing
 
 arguments :: Annotate Ann
 arguments =
-    modes_ [status, setLights, setName, alert, reset, scan, redshift]
+    modes_
+            [ status
+            , groupStatus
+            , setLights
+            , setName
+            , alert
+            , reset
+            , scan
+            , redshift
+            ]
         += program "hkhue"
         += help "A scripting client for Philips Hue lights"
         += helpArg [name "h"]
@@ -349,3 +394,7 @@ redshift =
 status :: Annotate Ann
 status = record Status [] += name "status" += help
     "Print the current status of the lights."
+
+groupStatus :: Annotate Ann
+groupStatus = record GroupStatus [] += name "group-status" += help
+    "Print the current status of each group."
