@@ -90,9 +90,9 @@ main = do
         $ initialDaemonState hueConfig (min bridgeInterval lightsInterval)
     bridgeSyncThread <- forkIO
         $ runReaderT (bridgeStateSync bridgeInterval) state
-    lightsSyncThread <- forkIO
-        $ runReaderT (lightStateSync lightsInterval) state
-    let forkedThreads = [bridgeSyncThread, lightsSyncThread]
+    partialSyncThread <- forkIO
+        $ runReaderT (partialStateSync lightsInterval) state
+    let forkedThreads = [bridgeSyncThread, partialSyncThread]
     flip finally (mapM_ killThread forkedThreads)
         $ WS.runServer (configBindHost config) (configBindPort config)
         $ application state
@@ -203,14 +203,16 @@ bridgeStateSync syncInterval =
         modifyState_ $ \s -> return s { daemonBridgeState = bridgeState }
         liftIO . threadDelay $ syncInterval * 1000000
 
--- | Pull & update the `bridgeLights` map every 5 seconds.
-lightStateSync :: Int -> App ()
-lightStateSync syncInterval =
-    handleAny (const $ lightStateSync syncInterval) . forever $ do
+-- | Pull & update the `bridgeLights` & `bridgeGroups` map every 5 seconds.
+partialStateSync :: Int -> App ()
+partialStateSync syncInterval =
+    handleAny (const $ partialStateSync syncInterval) . forever $ do
         lightStates <- runHue getFullLightStates
+        groupStates <- runHue getFullGroupStates
         modifyState_ $ \s -> return s
             { daemonBridgeState = (daemonBridgeState s)
                 { bridgeLights = lightStates
+                , bridgeGroups = groupStates
                 }
             }
         liftIO . threadDelay $ syncInterval * 1000000

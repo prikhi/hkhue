@@ -14,12 +14,12 @@ module HkHue.Client
     , alertAll
     , setAllState
     , resetColors
-    , getGroups
     , createGroup
     , renameGroup
     , setGroupState
     , getFullBridgeState
     , getFullLightStates
+    , getFullGroupStates
     , scaleColorTemp
     , scaleBrightness
     , unscaleBrightness
@@ -57,6 +57,7 @@ import           HkHue.Messages                 ( StateUpdate(..)
                                                 )
 import           HkHue.Types                    ( BridgeState(..)
                                                 , BridgeLight
+                                                , BridgeGroup
                                                 )
 
 import qualified Data.Map.Strict               as Map
@@ -172,13 +173,6 @@ resetColors = setAllState StateUpdate { suColor            = Nothing
                                       , suPower            = Just On
                                       }
 
--- | Get a list of all groups added to the bridge.
-getGroups :: HueClient (Maybe Value)
-getGroups = do
-    response <- makeAuthRequest "groups" >>= liftIO . get
-    liftIO (print response)
-    return $ response ^? responseBody . _JSON
-
 -- | Create a group with the given name and optional set of light IDs.
 createGroup :: T.Text -> [Int] -> HueClient (Maybe Integer)
 createGroup name lightIds = do
@@ -224,6 +218,10 @@ getFullBridgeState = getPrintAndDecode ""
 -- | Pull all `BridgeLight` states from the Hue bridge.
 getFullLightStates :: HueClient (Map.Map Int BridgeLight)
 getFullLightStates = getPrintAndDecode "lights"
+
+-- | Get a list of all groups added to the bridge.
+getFullGroupStates :: HueClient (Map.Map Int BridgeGroup)
+getFullGroupStates = getPrintAndDecode "groups"
 
 -- | Make an authorized GET request, print the response, & decode the body.
 getPrintAndDecode :: FromJSON a => T.Text -> HueClient a
