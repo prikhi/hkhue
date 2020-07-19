@@ -14,6 +14,10 @@ module HkHue.Client
     , alertAll
     , setAllState
     , resetColors
+    , getGroups
+    , createGroup
+    , renameGroup
+    , setGroupState
     , getFullBridgeState
     , getFullLightStates
     , scaleColorTemp
@@ -167,6 +171,49 @@ resetColors = setAllState StateUpdate { suColor            = Nothing
                                       , suTransitionTime   = Nothing
                                       , suPower            = Just On
                                       }
+
+-- | Get a list of all groups added to the bridge.
+getGroups :: HueClient (Maybe Value)
+getGroups = do
+    response <- makeAuthRequest "groups" >>= liftIO . get
+    liftIO (print response)
+    return $ response ^? responseBody . _JSON
+
+-- | Create a group with the given name and optional set of light IDs.
+createGroup :: T.Text -> [Int] -> HueClient (Maybe Integer)
+createGroup name lightIds = do
+    let req = object
+            [ "lights" .= map show lightIds
+            , "name" .= name
+            , "type" .= ("LightGroup" :: T.Text)
+            ]
+    response <- makeAuthRequest "groups" >>= liftIO . (`post` req)
+    liftIO (print response)
+    return
+        $  response
+        ^? responseBody
+        .  nth 0
+        .  key "success"
+        .  key "id"
+        .  _Integer
+
+renameGroup :: Int -> T.Text -> HueClient ()
+renameGroup groupId newName =
+    let req = object ["name" .= newName]
+    in  makeAuthRequest ("groups/" <> T.pack (show groupId))
+            >>= liftIO
+            .   (`put` req)
+            >>= liftIO
+            .   print
+
+setGroupState :: Int -> StateUpdate -> HueClient ()
+setGroupState groupId stateUpdate =
+    makeAuthRequest ("groups/" <> T.pack (show groupId) <> "/action")
+        >>= liftIO
+        .   (`put` stateUpdateToHueJSON stateUpdate)
+        >>= liftIO
+        .   print
+
 
 -- Configuration
 
