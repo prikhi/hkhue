@@ -25,7 +25,6 @@ Dunno exactly what I want but probably most of this:
 
 * Basic usage
   * Groups
-    * Query status of groups
     * Add light to group
     * Create new group
     * Add `-g` flag to commands to limit to given groups

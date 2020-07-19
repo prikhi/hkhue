@@ -1,8 +1,13 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {- | Gradually brighten & increase color temperature to ease waking up.
 
 This starts at pure red & gets to 6500K and full brightness in 60 minutes,
 or faster if you are already in the wakeup sequence.
+
+You can specify the groups to operate on using the @--group@ flag.
+E.g., @--group Bedroom --group Bathroom@ would only affect the lights in @Bedroom@
+and @Bathroom@ groups.
 
 TODO:
 You can stretch or shrink this by specifying the @--time-multiplier@ flags.
@@ -16,20 +21,37 @@ TODO:
 Finally, you can override the starting color & brightness with the
 @--start-color@ and @--start-brightness@ flags.
 
-TODO:
 See @--help@ for additional information.
 
 
 -}
 import           Control.Concurrent             ( threadDelay )
-import           Control.Monad                  ( when )
+import           Control.Monad                  ( when
+                                                , forM_
+                                                )
+import           Data.Data                      ( Data )
 import           Data.Default                   ( Default(def) )
+import           Data.List                      ( nub )
 import           Data.Maybe                     ( mapMaybe )
 import           Data.Time.Format               ( formatTime
                                                 , defaultTimeLocale
                                                 )
 import           Data.Time.LocalTime            ( getZonedTime )
+import           Data.Typeable                  ( Typeable )
 import           Network.Socket                 ( withSocketsDo )
+import           System.Console.CmdArgs         ( Annotate(..)
+                                                , Ann
+                                                , (+=)
+                                                , cmdArgs_
+                                                , help
+                                                , helpArg
+                                                , record
+                                                , name
+                                                , explicit
+                                                , typ
+                                                , program
+                                                , summary
+                                                )
 import           System.Exit                    ( exitFailure )
 
 import           HkHue.Config                   ( getConfig
@@ -38,6 +60,8 @@ import           HkHue.Config                   ( getConfig
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
                                                 , LightData(..)
+                                                , GroupIdentifier(..)
+                                                , GroupData(..)
                                                 , LightColor(..)
                                                 , RGBColor(..)
                                                 , LightPower(On)
@@ -46,6 +70,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , receiveMessage
                                                 )
 
+import qualified Data.Text                     as T
 import qualified Network.WebSockets            as WS
 
 {-| The (Temperature, Brightness, Minutes) Ramp Up. -}
@@ -63,41 +88,89 @@ temperatureRamp =
 
 main :: IO ()
 main = do
+    args <- cmdArgs_ arguments
     printWithDate "Starting wake up sequence."
     config <- getConfig
     withSocketsDo $ WS.runClient (configDaemonAddress config)
                                  (configDaemonPort config)
                                  "/"
-                                 run
+                                 (run args)
     printWithDate "Wake up sequence complete."
 
 
-run :: WS.Connection -> IO ()
-run conn = do
+newtype Args
+    = Args
+        { groups :: [String]
+        } deriving (Data, Typeable)
+
+arguments :: Annotate Ann
+arguments =
+    record
+            (Args [])
+            [ groups
+              := []
+              += name "group"
+              += name "g"
+              += explicit
+              += typ "GROUP"
+              += help
+                     "Group ID or name to operate on.\nMultiple flags operates on multiple groups."
+            ]
+        += help
+               "Gradually increase color temperature & brightness of your lights."
+        += helpArg [name "h"]
+        += program "wakeup"
+        += summary "hkhue wakeup script"
+
+
+run :: Args -> WS.Connection -> IO ()
+run args conn = do
     sendMessage conn GetLightInfo
     lightData <- receiveMessage conn >>= \case
         Just (LightInfo i) -> return i
         _ -> putStrLn "Could not fetch light data." >> exitFailure
-    let (ramp, startRed) = case currentStage lightData of
+    groupData <- if null $ groups args
+        then return []
+        else sendMessage conn GetGroupInfo >> receiveMessage conn >>= \case
+            Just (GroupInfo i) -> return $ filter inGroupArgs i
+            _ -> putStrLn "Could not fetch group data." >> exitFailure
+    let groupLights = nub $ concatMap (map fst . gdLights) groupData
+        lights      = if null groupData
+            then lightData
+            else filter ((`elem` groupLights) . ldId) lightData
+        (ramp, startRed) = case currentStage lights of
             Nothing    -> (temperatureRamp, True)
             Just stage -> (drop (stage + 1) temperatureRamp, False)
     when startRed $ do
         printWithDate "Turning on red lights at lowest brightness."
-        sendMessage conn $ SetAllState def { suColor = Just $ RGBColor 255 0 0
-                                           , suBrightness = Just 1
-                                           , suPower = Just On
-                                           }
+        setState
+            conn
+            groupData
+            def { suColor      = Just $ RGBColor 255 0 0
+                , suBrightness = Just 1
+                , suPower      = Just On
+                }
         threadDelay 1000000
-    mapM_ (setColorAndWait conn) ramp
+    mapM_ (setColorAndWait groupData conn) ramp
+  where
+    inGroupArgs :: GroupData -> Bool
+    inGroupArgs gd =
+        T.unpack (gdName gd)
+            `elem` groups args
+            ||     show (gdId gd)
+            `elem` groups args
 
 
-setColorAndWait :: WS.Connection -> (Int, Int, Int) -> IO ()
-setColorAndWait conn (colorTemp, brightness, minutes) = do
-    sendMessage conn $ SetAllState def
-        { suColorTemperature = Just colorTemp
-        , suBrightness       = Just brightness
-        , suTransitionTime   = Just $ minutes * 60 * 10
-        }
+
+setColorAndWait :: [GroupData] -> WS.Connection -> (Int, Int, Int) -> IO ()
+setColorAndWait groupData conn (colorTemp, brightness, minutes) = do
+    setState
+        conn
+        groupData
+        def { suColorTemperature = Just colorTemp
+            , suBrightness       = Just brightness
+            , suTransitionTime   = Just $ minutes * 60 * 10
+            }
     threadDelay $ minutes * 60 * 1000000
     printWithDate
         $  "Reached "
@@ -148,3 +221,11 @@ currentStage lightData =
                 else findStage selector target (next : rest) (index + 1)
         [final] -> if selector final <= target then Just index else Nothing
         []      -> Nothing
+
+-- | Set the light state of the given groups or all lights if no groups
+-- present.
+setState :: WS.Connection -> [GroupData] -> StateUpdate -> IO ()
+setState conn groupData stateUpdate = if null groupData
+    then sendMessage conn $ SetAllState stateUpdate
+    else forM_ groupData $ \gd ->
+        sendMessage conn $ SetGroupState (GroupId $ gdId gd) stateUpdate
