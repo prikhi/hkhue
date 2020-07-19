@@ -24,6 +24,11 @@ There is a daemon & CLI client, which currently supports:
 Dunno exactly what I want but probably most of this:
 
 * Basic usage
+  * Groups
+    * Query status of groups
+    * Add light to group
+    * Create new group
+    * Add `-g` flag to commands to limit to given groups
   * Query light status
     * Improve the XY -> RGB conversion - sometimes the values are negative...
   * Create/run preset scenes
@@ -69,7 +74,8 @@ Dunno exactly what I want but probably most of this:
   * Sound reactive
   * Color based on computer monitor
 * Not so urgent
-  * Similar commands for controlling groups
+  * Similar commands for controlling groups(or add a `-g group1,group2,etc`
+    flag).
   * Better bridge pairing flow(prompt user through UI apps, not daemon),
     autodiscovering
   * Support multiple bridges & cross-bridge scenes
@@ -79,7 +85,9 @@ Dunno exactly what I want but probably most of this:
     * `--on-only`
     * `--pull` - instead of pushing color temp to redshift, pull color temp
       from redshift
+    * `--groups`
 * Code cleanup
+  * Add a REST interface as well for things that are awkward with websockets
   * More function/API docs
   * Add types for things like PercentBrightness, HueBrightness(1-254),
     ByteChannel(0-255), UnitChannel(0-1), TransitionTime, etc.
