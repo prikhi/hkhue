@@ -32,7 +32,7 @@ Dunno exactly what I want but probably most of this:
     * Create new group
     * Rename group
     * Delete group
-    * Add `-g` flag to `redshift` & `alert` command to limit to given groups
+    * Add `-g` flag to `alert` command to limit to given groups
   * Query light status
     * Improve the XY -> RGB conversion - sometimes the values are negative...
   * Create/run preset scenes
@@ -89,7 +89,6 @@ Dunno exactly what I want but probably most of this:
     * `--on-only`
     * `--pull` - instead of pushing color temp to redshift, pull color temp
       from redshift
-    * `--groups`
 * Code cleanup
   * Add a REST interface as well for things that are awkward with websockets
   * More function/API docs

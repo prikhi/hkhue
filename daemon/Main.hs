@@ -237,10 +237,11 @@ handleClientMessages (_, conn) = \case
     Alert {..} -> if null lightIds
         then runHue alertAll
         else mapM_ (fromLightIdentifier >=> runHue . alertLight) lightIds
-    ScanLights          -> runHue searchForLights
-    GetAverageColorTemp -> getAverageColorTemp conn
-    GetLightInfo        -> getLightInfo conn
-    GetGroupInfo        -> getGroupInfo conn
+    ScanLights -> runHue searchForLights
+    GetAverageColorTemp groupIds ->
+        mapM fromGroupIdentifier groupIds >>= flip getAverageColorTemp conn
+    GetLightInfo -> getLightInfo conn
+    GetGroupInfo -> getGroupInfo conn
   where
     -- | Send an update to every light at once, unless a brightness
     -- adjustment is necessary(see `handlePowerBrightness`).
@@ -274,7 +275,7 @@ handleClientMessages (_, conn) = \case
                               $   handlePowerBrightness i lState
                               >>= storeColorTemperature i
             if any ((/=) lState . snd) newStates
-                then forM_ newStates $ (\(i, s) -> runHue $ setState i s)
+                then forM_ newStates $ \(i, s) -> runHue $ setState i s
                 else runHue $ setGroupState gId lState
 
 -- | Determine the average color temperature in Kelvins.
@@ -283,10 +284,20 @@ handleClientMessages (_, conn) = \case
 -- mode. If there are none, we fall back to the temperature values we cache
 -- during state updates. If there are none of those either, we simply wait
 -- until the light state has been re-synced & then try again.
-getAverageColorTemp :: WS.Connection -> App ()
-getAverageColorTemp conn = do
-    maybeCurrentTemp <- averageActiveLightTemperature
-    maybeCachedTemp  <- averageCachedLightTemperature
+getAverageColorTemp :: [Int] -> WS.Connection -> App ()
+getAverageColorTemp groupIds conn = do
+    lightIds <- if null groupIds
+        then Map.keys . bridgeLights . daemonBridgeState <$> readState
+        else
+            concatMap (bgLights . snd)
+            .   filter ((`elem` groupIds) . fst)
+            .   Map.assocs
+            .   bridgeGroups
+            .   daemonBridgeState
+            <$> readState
+
+    maybeCurrentTemp <- averageActiveLightTemperature lightIds
+    maybeCachedTemp  <- averageCachedLightTemperature lightIds
     case maybeCurrentTemp <|> maybeCachedTemp of
         Nothing ->
             daemonCacheInterval
@@ -294,25 +305,32 @@ getAverageColorTemp conn = do
                 >>= liftIO
                 .   threadDelay
                 .   (* 1000000)
-                >>  getAverageColorTemp conn
+                >>  getAverageColorTemp groupIds conn
         Just ct -> sendDaemonMsg conn $ AverageColorTemp ct
   where
     -- Average the color temperature of lights that are turned on and in CT
     -- mode.
-    averageActiveLightTemperature =
+    averageActiveLightTemperature lightIds =
         fmap scaleColorTemp
             .   safeAvg
             .   map (\(_, _, colorTemp) -> colorTemp)
             .   filter (\(isOn, colorMode, _) -> isOn && colorMode == "ct")
             .   map ((\s -> (blsOn s, blsColorMode s, blsCT s)) . blState)
             .   Map.elems
+            .   onlySelectedLights lightIds
             .   bridgeLights
             .   daemonBridgeState
             <$> readState
 
     -- Average the cached color temperatures.
-    averageCachedLightTemperature =
-        safeAvg . Map.elems . daemonStoredTemperature <$> readState
+    averageCachedLightTemperature lightIds =
+        safeAvg
+            .   Map.elems
+            .   onlySelectedLights lightIds
+            .   daemonStoredTemperature
+            <$> readState
+
+    onlySelectedLights lightIds = Map.filterWithKey $ \k _ -> k `elem` lightIds
 
     -- Average a list, returning Nothing if it's empty.
     safeAvg xs = sum xs `safeDiv` length xs

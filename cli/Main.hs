@@ -138,6 +138,7 @@ data ClientMode = SetLight
                 | Scan
                 | Redshift
                     { interval :: Int
+                    , groups :: [String]
                     }
                 | Status
                 | GroupStatus
@@ -175,7 +176,7 @@ dispatch = \case
         \conn -> sendClientMsg conn . Alert $ map parseLight lights
     Reset         -> (`sendClientMsg` ResetAll)
     Scan          -> (`sendClientMsg` ScanLights)
-    Redshift {..} -> syncRedshift interval
+    Redshift {..} -> syncRedshift interval $ map parseGroup groups
     Status        -> printStatus
     GroupStatus   -> printGroupStatus
   where
@@ -200,9 +201,9 @@ setGroupStates :: [GroupIdentifier] -> StateUpdate -> WSDispatch
 setGroupStates groupIds stateUpdate conn =
     mapM_ (sendClientMsg conn . flip SetGroupState stateUpdate) groupIds
 
-syncRedshift :: Int -> WSDispatch
-syncRedshift syncInterval conn = forever $ do
-    sendClientMsg conn GetAverageColorTemp
+syncRedshift :: Int -> [GroupIdentifier] -> WSDispatch
+syncRedshift syncInterval groupIds conn = forever $ do
+    sendClientMsg conn $ GetAverageColorTemp groupIds
     receiveDaemonMsg conn >>= \case
         Just (AverageColorTemp ct) -> do
             try (readProcess (proc "redshift" ["-P", "-O", show ct])) >>= \case
@@ -392,14 +393,21 @@ scan =
 redshift :: Annotate Ann
 redshift =
     record
-            (Redshift def)
+            (Redshift def [])
             [ interval
-              := 5
-              += name "interval"
-              += name "i"
-              += explicit
-              += typ "SECONDS"
-              += help "Set the syncing interval."
+            := 5
+            += name "interval"
+            += name "i"
+            += explicit
+            += typ "SECONDS"
+            += help "Set the syncing interval."
+            , groups
+            := []
+            += name "group"
+            += name "g"
+            += explicit
+            += typ "GROUP"
+            += help "Restrict to group.\nCan specify multiple times."
             ]
         += name "redshift"
         += help "Sync redshift to your lights."

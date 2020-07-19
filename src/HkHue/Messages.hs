@@ -44,7 +44,7 @@ data ClientMsg
     | ResetAll
     | Alert { lightIds :: [LightIdentifier] }
     | ScanLights
-    | GetAverageColorTemp
+    | GetAverageColorTemp { groupIds :: [GroupIdentifier] }
     | GetLightInfo
     | GetGroupInfo
     deriving (Generic, Show)
