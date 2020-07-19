@@ -120,7 +120,7 @@ initialDaemonState hueConfig minSyncInterval = DaemonState
     , daemonNextClientId      = ClientId 1
     , daemonStoredBrightness  = Map.empty
     , daemonStoredTemperature = Map.empty
-    , daemonBridgeState       = BridgeState Map.empty
+    , daemonBridgeState       = BridgeState Map.empty Map.empty
     , daemonCacheInterval     = minSyncInterval
     }
 
