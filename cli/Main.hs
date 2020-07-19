@@ -66,6 +66,7 @@ import           HkHue.Messages                 ( ClientMsg(..)
                                                 , RGBColor(..)
                                                 , LightPower(..)
                                                 , LightData(..)
+                                                , GroupIdentifier(..)
                                                 , GroupData(..)
                                                 , sendMessage
                                                 , receiveMessage
@@ -118,6 +119,7 @@ receiveDaemonMsg = receiveMessage
 
 data ClientMode = SetLight
                     { lights :: [String]
+                    , groups :: [String]
                     , color :: Maybe RGBColor
                     , brightness :: Maybe Int
                     , colorTemperature :: Maybe Int
@@ -146,19 +148,26 @@ parseLight s = case readMaybe s of
     Nothing -> LightName $ T.pack s
     Just i  -> LightId i
 
+parseGroup :: String -> GroupIdentifier
+parseGroup s = case readMaybe s of
+    Nothing -> GroupName $ T.pack s
+    Just i  -> GroupId i
+
 dispatch :: ClientMode -> WSDispatch
 dispatch = \case
     SetLight {..} -> \conn -> do
         let lightIds    = map parseLight lights
+            groupIds    = map parseGroup groups
             stateUpdate = StateUpdate { suColor            = color
                                       , suBrightness       = brightness
                                       , suColorTemperature = colorTemperature
                                       , suTransitionTime   = transitionTime
                                       , suPower            = lightPower
                                       }
-        if null lightIds
-            then setAllState stateUpdate conn
-            else setLightStates lightIds stateUpdate conn
+        case (lightIds, groupIds) of
+            ([], []) -> setAllState stateUpdate conn
+            (ls, []) -> setLightStates ls stateUpdate conn
+            (_ , gs) -> setGroupStates gs stateUpdate conn
         delayTransition wait transitionTime
     Rename {..} ->
         (`sendClientMsg` SetLightName (parseLight light) (T.pack lName))
@@ -186,6 +195,10 @@ setAllState stateUpdate conn = sendClientMsg conn $ SetAllState stateUpdate
 setLightStates :: [LightIdentifier] -> StateUpdate -> WSDispatch
 setLightStates lightIds stateUpdate conn =
     mapM_ (sendClientMsg conn . flip SetLightState stateUpdate) lightIds
+
+setGroupStates :: [GroupIdentifier] -> StateUpdate -> WSDispatch
+setGroupStates groupIds stateUpdate conn =
+    mapM_ (sendClientMsg conn . flip SetGroupState stateUpdate) groupIds
 
 syncRedshift :: Int -> WSDispatch
 syncRedshift syncInterval conn = forever $ do
@@ -283,8 +296,15 @@ arguments =
 setLights :: Annotate Ann
 setLights =
     record
-            (SetLight def def def def def def def)
+            (SetLight def [] def def def def def def)
             [ lights := def += args += typ "LIGHT ..."
+            , groups
+            := []
+            += name "group"
+            += name "g"
+            += explicit
+            += typ "GROUP"
+            += help "Restrict to group.\nCan specify multiple times."
             , color
             := def
             += name "color"
@@ -330,6 +350,10 @@ setLights =
         += explicit
         += name "set"
         += help "Set the state of the light(s)."
+        += details
+               [ "If the group flag is set, ignore any passed lights."
+               , "If no lights or groups are set, update every light."
+               ]
 
 setName :: Annotate Ann
 setName =

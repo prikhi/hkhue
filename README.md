@@ -26,8 +26,11 @@ Dunno exactly what I want but probably most of this:
 * Basic usage
   * Groups
     * Add light to group
+    * Remove light from group
     * Create new group
-    * Add `-g` flag to commands to limit to given groups
+    * Rename group
+    * Delete group
+    * Add `-g` flag to `redshift` & `alert` command to limit to given groups
   * Query light status
     * Improve the XY -> RGB conversion - sometimes the values are negative...
   * Create/run preset scenes
