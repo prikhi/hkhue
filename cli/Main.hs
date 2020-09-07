@@ -9,7 +9,14 @@ module Main
 where
 
 import           Control.Concurrent             ( threadDelay )
-import           Control.Exception.Safe         ( try )
+import           Control.Exception.Safe         ( Exception
+                                                , IOException
+                                                , displayException
+                                                , handle
+                                                , handleIO
+                                                , throw
+                                                , try
+                                                )
 import           Control.Monad                  ( forever
                                                 , when
                                                 )
@@ -50,7 +57,6 @@ import           Text.Tabular                   ( Table(..)
 import           Text.Tabular.AsciiArt          ( render )
 import           System.Exit                    ( ExitCode(ExitSuccess)
                                                 , exitSuccess
-                                                , exitFailure
                                                 )
 import           System.Process.Typed           ( readProcess
                                                 , proc
@@ -81,22 +87,35 @@ main :: IO ()
 main = do
     clientMode <- cmdArgs_ arguments
     config     <- getConfig
-    -- TODO: Catch resource vanished from Socket.recvBuf as well
-    --       Also handle Socket.connect failures(e.g., no route to host)
-    result     <- try . withSocketsDo $ WS.runClient
+    result     <- catchErrors . withSocketsDo $ WS.runClient
         (configDaemonAddress config)
         (configDaemonPort config)
         "/"
         (app $ dispatch clientMode)
     case result of
-        Left WS.ConnectionClosed ->
-            putStrLn "Lost Connection to Server, Retrying in 5 Seconds."
+        Left err ->
+            putStrLn (showError err)
+                >> putStrLn "Retrying in 5 Seconds."
                 >> threadDelay 5000000
                 >> main
-        Left err ->
-            putStrLn ("Encountered a Connection Error: " <> show err)
-                >> exitFailure
         Right () -> exitSuccess
+  where
+    catchErrors :: IO a -> IO (Either AppErrors a)
+    catchErrors =
+        try . handleIO (throw . AppIOError) . handle (throw . ConnectionError)
+    showError :: AppErrors -> String
+    showError = \case
+        ConnectionError WS.ConnectionClosed -> "Lost Connection to Server."
+        ConnectionError e ->
+            "Encountered a Connection Error: " <> displayException e
+        AppIOError e -> "Encountered I/O Error: " <> displayException e
+
+data AppErrors
+    = ConnectionError WS.ConnectionException
+    | AppIOError IOException
+    deriving (Show)
+
+instance Exception AppErrors
 
 
 -- WebSockets
