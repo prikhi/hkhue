@@ -1,0 +1,25 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "hkhue:lib"
+
+    - path: "./cli/Main.hs"
+      component: "hkhue:exe:hkhue"
+
+    - path: "./cli/Paths_hkhue.hs"
+      component: "hkhue:exe:hkhue"
+
+    - path: "./daemon/Main.hs"
+      component: "hkhue:exe:hkhued"
+
+    - path: "./daemon/Paths_hkhue.hs"
+      component: "hkhue:exe:hkhued"
+
+    - path: "./examples/wakeup/Wakeup.hs"
+      component: "hkhue:exe:wakeup"
+
+    - path: "./examples/wakeup/Paths_hkhue.hs"
+      component: "hkhue:exe:wakeup"
+
+    - path: "./test"
+      component: "hkhue:test:hkhue-test"
