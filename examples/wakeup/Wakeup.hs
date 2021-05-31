@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 {- | Gradually brighten & increase color temperature to ease waking up.
 
 This starts at pure red & gets to 6500K and full brightness in 60 minutes,
@@ -33,6 +34,7 @@ import           Control.Monad                  ( when
 import           Data.Aeson                     ( FromJSON(..)
                                                 , (.:?)
                                                 , withObject
+                                                , Value(..)
                                                 )
 import           Data.Data                      ( Data )
 import           Data.Default                   ( Default(def) )
@@ -120,7 +122,16 @@ instance FromJSON Args where
     parseJSON = withObject "Args" $ \o -> fmap (fromMaybe def) $ runMaybeT $ do
         inner <- MaybeT $ o .:? "wakeup"
         gs    <- MaybeT $ withObject "Wakeup" (\v -> v .:? "groups") inner
-        return $ Args gs
+        Args <$> mapM parseGroup gs
+      where
+        parseGroup :: MonadFail m => Value -> m String
+        parseGroup = \case
+            String s -> return $ T.unpack s
+            Number n -> return $ show @Int $ floor n
+            unexp ->
+                fail
+                    $  "Group ID/Name: Expected STRING or NUMBER, got "
+                    <> show unexp
 
 -- | Config file args defaults to all groups.
 instance Default Args where

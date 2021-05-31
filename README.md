@@ -172,6 +172,7 @@ wakeup:
     groups:
         - 1
         - 4
+        - living-room
 ```
 
 
