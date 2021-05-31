@@ -166,6 +166,12 @@ daemon:
     bridge-sync-interval: 60
     # Seconds Between Light State Cache Resyncs
     lights-sync-interval: 5
+
+# The default groups for the `wakeup` script
+wakeup:
+    groups:
+        - 1
+        - 4
 ```
 
 

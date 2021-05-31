@@ -86,6 +86,7 @@ executables:
     - cmdargs
     - network
     - time
+    - transformers
 
 tests:
   hkhue-test:

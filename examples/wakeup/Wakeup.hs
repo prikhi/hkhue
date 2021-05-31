@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {- | Gradually brighten & increase color temperature to ease waking up.
 
 This starts at pure red & gets to 6500K and full brightness in 60 minutes,
@@ -29,10 +30,19 @@ import           Control.Concurrent             ( threadDelay )
 import           Control.Monad                  ( when
                                                 , forM_
                                                 )
+import           Data.Aeson                     ( FromJSON(..)
+                                                , (.:?)
+                                                , withObject
+                                                )
 import           Data.Data                      ( Data )
 import           Data.Default                   ( Default(def) )
 import           Data.List                      ( nub )
-import           Data.Maybe                     ( mapMaybe )
+import           Data.Maybe                     ( mapMaybe
+                                                , fromMaybe
+                                                )
+import           Control.Monad.Trans.Maybe      ( MaybeT(..)
+                                                , runMaybeT
+                                                )
 import           Data.Time.Format               ( formatTime
                                                 , defaultTimeLocale
                                                 )
@@ -88,7 +98,9 @@ temperatureRamp =
 
 main :: IO ()
 main = do
-    args <- cmdArgs_ arguments
+    rawArgs    <- cmdArgs_ arguments
+    configArgs <- getConfig
+    let args = if groups rawArgs == [] then configArgs else rawArgs
     printWithDate "Starting wake up sequence."
     config <- getConfig
     withSocketsDo $ WS.runClient (configDaemonAddress config)
@@ -103,6 +115,18 @@ newtype Args
         { groups :: [String]
         } deriving (Data, Typeable)
 
+-- | Allow parsing Args from config file as well.
+instance FromJSON Args where
+    parseJSON = withObject "Args" $ \o -> fmap (fromMaybe def) $ runMaybeT $ do
+        inner <- MaybeT $ o .:? "wakeup"
+        gs    <- MaybeT $ withObject "Wakeup" (\v -> v .:? "groups") inner
+        return $ Args gs
+
+-- | Config file args defaults to all groups.
+instance Default Args where
+    def = Args []
+
+-- | Parse CLI args
 arguments :: Annotate Ann
 arguments =
     record
