@@ -28,58 +28,58 @@ See @--help@ for additional information.
 
 -}
 import           Control.Concurrent             ( threadDelay )
-import           Control.Monad                  ( when
-                                                , forM_
-                                                )
-import           Data.Aeson                     ( FromJSON(..)
-                                                , (.:?)
-                                                , withObject
-                                                , Value(..)
-                                                )
-import           Data.Data                      ( Data )
-import           Data.Default                   ( Default(def) )
-import           Data.List                      ( nub )
-import           Data.Maybe                     ( mapMaybe
-                                                , fromMaybe
+import           Control.Monad                  ( forM_
+                                                , when
                                                 )
 import           Control.Monad.Trans.Maybe      ( MaybeT(..)
                                                 , runMaybeT
                                                 )
-import           Data.Time.Format               ( formatTime
-                                                , defaultTimeLocale
+import           Data.Aeson                     ( (.:?)
+                                                , FromJSON(..)
+                                                , Value(..)
+                                                , withObject
+                                                )
+import           Data.Data                      ( Data )
+import           Data.Default                   ( Default(def) )
+import           Data.List                      ( nub )
+import           Data.Maybe                     ( fromMaybe
+                                                , mapMaybe
+                                                )
+import           Data.Time.Format               ( defaultTimeLocale
+                                                , formatTime
                                                 )
 import           Data.Time.LocalTime            ( getZonedTime )
 import           Data.Typeable                  ( Typeable )
 import           Network.Socket                 ( withSocketsDo )
-import           System.Console.CmdArgs         ( Annotate(..)
+import           System.Console.CmdArgs         ( (+=)
                                                 , Ann
-                                                , (+=)
+                                                , Annotate(..)
                                                 , cmdArgs_
+                                                , explicit
                                                 , help
                                                 , helpArg
-                                                , record
                                                 , name
-                                                , explicit
-                                                , typ
                                                 , program
+                                                , record
                                                 , summary
+                                                , typ
                                                 )
 import           System.Exit                    ( exitFailure )
 
-import           HkHue.Config                   ( getConfig
-                                                , ClientConfig(..)
+import           HkHue.Config                   ( ClientConfig(..)
+                                                , getConfig
                                                 )
 import           HkHue.Messages                 ( ClientMsg(..)
                                                 , DaemonMsg(..)
-                                                , LightData(..)
-                                                , GroupIdentifier(..)
                                                 , GroupData(..)
+                                                , GroupIdentifier(..)
                                                 , LightColor(..)
-                                                , RGBColor(..)
+                                                , LightData(..)
                                                 , LightPower(On)
+                                                , RGBColor(..)
                                                 , StateUpdate(..)
-                                                , sendMessage
                                                 , receiveMessage
+                                                , sendMessage
                                                 )
 
 import qualified Data.Text                     as T
@@ -102,7 +102,7 @@ main :: IO ()
 main = do
     rawArgs    <- cmdArgs_ arguments
     configArgs <- getConfig
-    let args = if groups rawArgs == [] then configArgs else rawArgs
+    let args = if null (groups rawArgs) then configArgs else rawArgs
     printWithDate "Starting wake up sequence."
     config <- getConfig
     withSocketsDo $ WS.runClient (configDaemonAddress config)
@@ -121,7 +121,7 @@ newtype Args
 instance FromJSON Args where
     parseJSON = withObject "Args" $ \o -> fmap (fromMaybe def) $ runMaybeT $ do
         inner <- MaybeT $ o .:? "wakeup"
-        gs    <- MaybeT $ withObject "Wakeup" (\v -> v .:? "groups") inner
+        gs    <- MaybeT $ withObject "Wakeup" (.:? "groups") inner
         Args <$> mapM parseGroup gs
       where
         parseGroup :: MonadFail m => Value -> m String
